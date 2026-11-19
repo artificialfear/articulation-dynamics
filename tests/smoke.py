@@ -134,6 +134,62 @@ with sync_playwright() as p:
     pg.select_option("#inst", "perc"); pg.click("#dNewAll"); pg.screenshot(path=f"{out}/v2-dyn-perc.png")
     pg.click("#play"); pg.wait_for_timeout(800); pg.click("#play")
 
+    # ---- quiz
+    pg.select_option("#inst", "trumpet"); pg.click("#tabQuiz")
+    assert pg.is_visible("#quizUI")
+    # name it / whole class: hidden marks, ? marks, reveal shows them
+    pg.click("#qTopic [data-v=art]"); pg.click("#qType [data-v=name]"); pg.click("#qMode [data-v=class]")
+    assert ev(pg, "R.notes.filter(n=>n.art).length") == 0, "markings hidden"
+    assert pg.locator("#score svg text:text('?')").count() >= 3
+    pg.click("#play"); pg.wait_for_timeout(1200); pg.click("#play")
+    pg.screenshot(path=f"{out}/quiz-name-class.png")
+    pg.click("#qReveal"); assert ev(pg, "R.notes.filter(n=>n.art).length") >= 3
+    assert pg.is_visible("#banner")
+    pg.screenshot(path=f"{out}/quiz-name-revealed.png")
+    # name it / on my own: answer everything with the right answer except one, check score
+    pg.click("#qMode [data-v=solo]")
+    tg = ev(pg, "Q.q.targets"); truth = ev(pg, "Q.q.targets.map(i=>Q.q.notes[i].art)")
+    ids = [None, "stacc", "ten", "acc", "marc", "lift"]
+    for k, i in enumerate(tg):
+        x = ev(pg, f"R.xs[{i}]/R.W"); box = pg.locator("#score svg").bounding_box()
+        pg.mouse.click(box["x"] + box["width"] * x, box["y"] + box["height"] * 0.5)
+        assert ev(pg, "Q.q.sel") == i, ("sel", ev(pg, "Q.q.sel"), i)
+        a = truth[k] if k else ("ten" if truth[k] != "ten" else "stacc")
+        pg.keyboard.press(str(ids.index(a)))
+    assert not pg.is_disabled("#qCheck"); pg.click("#qCheck")
+    assert ev(pg, "Q.score.right") == len(tg) - 1 and ev(pg, "Q.score.total") == len(tg)
+    pg.screenshot(path=f"{out}/quiz-name-solo-checked.png")
+    # spot the mistake / on my own: tapping the right note scores
+    pg.click("#qType [data-v=spot]")
+    w = ev(pg, "Q.q.wrong[0]"); x = ev(pg, f"R.xs[{w}]/R.W"); box = pg.locator("#score svg").bounding_box()
+    pg.click("#play"); pg.wait_for_timeout(600); pg.click("#play")
+    pg.mouse.click(box["x"] + box["width"] * x, box["y"] + box["height"] * 0.5)
+    assert ev(pg, "Q.q.checked") and ev(pg, "Q.q.good") is True
+    pg.screenshot(path=f"{out}/quiz-spot-solo.png")
+    # which one / dynamics / whole class + present
+    pg.click("#qTopic [data-v=dyn]"); assert pg.is_disabled("#qType [data-v=name]")
+    pg.click("#qType [data-v=which]"); pg.click("#qMode [data-v=class]")
+    assert pg.locator("#qWhich .opt").count() == 3
+    pg.click("#play"); pg.wait_for_timeout(800)
+    assert pg.locator("#score .vf-stavenote.play").count() == 0, "which-one must not highlight the answer"
+    assert pg.locator("#score svg line.cursor").count() == 0
+    pg.click("#play")
+    pg.keyboard.press("p"); pg.screenshot(path=f"{out}/quiz-which-present.png")
+    pg.keyboard.press("r"); assert pg.locator("#qWhich .opt.right").count() == 1
+    pg.screenshot(path=f"{out}/quiz-which-present-revealed.png"); pg.click("#pExit")
+    # dynamics spot: every generated mistake must actually change what's played
+    same = ev(pg, """()=>{ let bad=0; Q.type='spot'; Q.topic='dyn';
+      for(let k=0;k<200;k++){ Quiz.newQuestion(); const a=levelFn(Q.q.notes), b=levelFn(Q.q.played);
+        let diff=0; for(let t=0;t<8;t+=0.25) diff=Math.max(diff,Math.abs(a(t)-b(t))); if(diff<1) bad++; if(!Q.q.wrong.length) bad++; }
+      return bad; }""")
+    assert same == 0, ("dyn spot mistakes not audible", same)
+    same = ev(pg, """()=>{ let bad=0; Q.type='spot'; Q.topic='art';
+      for(let k=0;k<200;k++){ Quiz.newQuestion(); const i=Q.q.wrong[0]; if((Q.q.notes[i].art||null)===(Q.q.played[i].art||null)) bad++; }
+      Q.type='which'; for(let k=0;k<100;k++){ Quiz.newQuestion(); if(Q.q.options.length<3) bad++; }
+      return bad; }""")
+    assert same == 0, ("art spot/which", same)
+    pg.click("#tabArt"); assert not pg.is_visible("#banner")
+
     # drawer + dark theme + narrow
     pg.select_option("#inst", "clarinet"); pg.click("#tabArt")
     pg.click("#gear"); pg.screenshot(path=f"{out}/v2-drawer.png"); pg.check("#darkTheme"); pg.click("#drawerClose"); pg.wait_for_timeout(300)

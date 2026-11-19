@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0 — 2026-11-19
+- **Listening Quiz** tab (Articulations or Dynamics):
+  - **Name it:** markings are hidden behind "?" marks. Listen and name each note's articulation.
+  - **Spot the mistake:** one note (or one dynamic spot) is played differently than written. Find it.
+  - **Which one?** Three versions are shown as A/B/C; pick the one being played. The dynamics versions always differ in shape (louder vs. softer, gradual vs. sudden), not just starting level.
+- Each question type has two modes:
+  - **Whole class:** answers out loud, then Reveal (R, or the Present bar). Works in Presentation mode.
+  - **On my own:** tap answers on your device, with a running score and streak.
+
 ## 2.0.0 — 2026-11-19
 - **Instrument picker:** each student picks their instrument and sees the music in their written key, while playback sounds in concert pitch. Concert-pitch treble and bass options are there for the viewboard, plus Percussion (snare) and Mallets.
 - **Pitch patterns** (⚙ Settings): single concert F or B♭, the concert B♭, F, and E♭ scales, and Remington long tones. Scales show the written key signature, and every instrument stays in a normal middle school range.

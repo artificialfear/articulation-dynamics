@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 const $ = id => document.getElementById(id);
 const store = {
   get(k,d){ try{ const v=localStorage.getItem("adt."+k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
@@ -178,6 +178,7 @@ function updateChrome(){
   $("micBtn").classList.toggle("hidden", m!=="art" || typeof Mic==="undefined" || !Mic.supported());
   $("artRefs").classList.toggle("hidden",m==="dyn"); $("dynRefs").classList.toggle("hidden",m==="art");
   $("pReveal").textContent = m==="quiz"? "👁 Reveal" : (S.reveal? "🙈 Hide shapes" : "👁 Show shapes");
+  if(m!=="quiz" && $("banner")) $("banner").classList.add("hidden");
 }
 
 /* ---------------- symbol guide ---------------- */

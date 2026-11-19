@@ -32,6 +32,13 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
 - Patterns: single pitch, the B♭/F/E♭ scales, and Remington.
 - Mic feedback measures note length only.
 
+## Quiz (js/quiz.js)
+- State is in `Q`; the topic, type, and mode are saved per device. A question is `Q.q`.
+- **Name it:** `targets` = artEligible notes. Solo answers go in `answers`. `check()` scores per note, and the streak counts only perfect questions.
+- **Spot the mistake:** `played` is an altered copy used only for audio. `wrong` is the list of note indexes that count as correct taps. Articulation mistakes use the `CONTRAST` map. Dynamics mistakes (`spotDyn`) either change one marking by 2+ levels or turn a hairpin the wrong way; the smoke test checks that every mistake changes the loudness curve audibly.
+- **Which one?:** the options must differ (articulations: different patterns; dynamics: different contour first). Playback for "which" never highlights notes or shows the cursor, because that would give the answer away.
+- Quiz messages show in `#banner` inside the score card so they're visible in Presentation mode.
+
 ## Notes
 - Slurs are only generated with a pattern that moves (a slur over one repeated pitch would look like a tie). The Slur button is disabled when the next note has the same pitch.
 - Articulations go on the notehead side; marcato always goes above.
