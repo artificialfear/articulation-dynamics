@@ -125,13 +125,14 @@ function renderScore(host,cfg){
   let y=bottom+12;
   if(cfg.mode==="art"){
     if(cfg.shapes){
-      const h=20; let m="";
+      const h=20; let m=""; var bars={};
       items.forEach((it,k)=>{
         if(it.i<0) return; const n=notes[it.i]; if(n.rest) return;
         const x=it.sn.getNoteHeadBeginX()-3;
         const nxt = k<items.length-1 ? items[k+1].sn.getNoteHeadBeginX()-9 : endX;
         const sound = (n.sl||n.tie)? 1 : undefined;
         m+=shapeMarkup(x,y,Math.max(14,nxt-x),h, (n.sl||n.tie)? (n.art==="acc"?"acc":"ten") : n.art, sound);
+        bars[it.i]={x,y,w:Math.max(14,nxt-x),h};
       });
       const g=svgEl("g",{class:"shapes"},svg); g.innerHTML=m;
       y+=h+16;
@@ -186,7 +187,7 @@ function renderScore(host,cfg){
   const top=Math.min(bb.y,topLine-30)-8, h=Math.max(bb.y+bb.height,y)-top+8;
   svg.setAttribute("viewBox",`0 ${top} ${W} ${h}`);
   svg.removeAttribute("width"); svg.removeAttribute("height"); svg.style.width="100%"; svg.style.height="auto";
-  return {svg,els,xs,anchors,top:topLine-14,bot:botLine+14,W,notes};
+  return {svg,els,xs,anchors,top:topLine-14,bot:botLine+14,W,notes,bars:(typeof bars!=="undefined")?bars:null};
 }
 
 /* ---------- small icons ---------- */

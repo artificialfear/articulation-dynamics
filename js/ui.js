@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.1.0";
+const VERSION = "2.2.0";
 const $ = id => document.getElementById(id);
 const store = {
   get(k,d){ try{ const v=localStorage.getItem("adt."+k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
@@ -298,6 +298,7 @@ $("aClear").onclick=()=>{ S.art.notes.forEach(n=>n.art=null); dirty(); draw(); }
 $("dShuffle").onclick=()=>{ randomizeDyns(S.dyn.notes); S.dyn.sel=-1; dirty(); draw(); };
 $("dClear").onclick=()=>{ S.dyn.notes.forEach(n=>{n.dyn=null;n.hp=null;}); dirty(); draw(); };
 $("play").onclick=play;
+$("micBtn").onclick=()=>Mic.toggle();
 $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm";
 $("tempo").oninput=e=>{ S.tempo=+e.target.value; $("tempoVal").textContent=S.tempo+" bpm"; store.set("tempo",S.tempo); };
 $("labels").checked=S.labels; $("labels").onchange=e=>{ S.labels=e.target.checked; store.set("labels",S.labels); draw(); };

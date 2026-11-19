@@ -190,11 +190,64 @@ with sync_playwright() as p:
     assert same == 0, ("art spot/which", same)
     pg.click("#tabArt"); assert not pg.is_visible("#banner")
 
+    # ---- mic analysis on synthetic takes (known lengths, noise, room echo, mic lag)
+    acc = ev(pg, """()=>{
+      const out={worst:0, bad:[], flagged:0};
+      const sim=(notes,spb,frac,lag)=>{
+        const sr=48000,hop=256,t0=10,T=t0+4*spb, plan=playPlan(notes,'art'), frames=[];
+        for(let t=t0-0.3;t<T+4*spb+0.7;t+=hop/sr){
+          let r=0.002*(0.7+Math.random()*0.6);
+          [0,1,2,3].forEach(b=>{ if(t>=t0+b*spb+lag && t<t0+b*spb+lag+0.03) r+=0.2; });
+          plan.forEach((ev,k)=>{
+            const s=T+ev.start*spb+lag, len=frac(ev,k)*(ev.end-ev.start)*spb, e=s+len;
+            if(t>=s && t<e){ const x=(t-s)/len; r+=0.1*(ev.decay? (1-0.6*x) : 1); }
+            else if(t>=e && t<e+0.3){ r+=0.1*(ev.decay?0.4:1)*Math.exp(-(t-e)/0.05); }
+          });
+          frames.push({t,r});
+        }
+        return analyzeTake(frames,notes,T,spb,t0);
+      };
+      S.inst='trumpet'; S.pattern='scale_Bb'; S.artOpt={rests:true,slurs:true,ties:true};
+      for(let k=0;k<60;k++){
+        const notes=newExample('art'), spb=60/(60+Math.random()*80), lag=0.02+Math.random()*0.12;
+        const plan=playPlan(notes,'art');
+        const good=sim(notes,spb,(ev)=>Math.min(1,ev.sound/(ev.end-ev.start)),lag);
+        good.items.forEach((it,j)=>{ const d=Math.abs(it.measured-it.target); out.worst=Math.max(out.worst,d); (out.errs=out.errs||[]).push([d,it.name,Math.round(spb*1000),plan[j].end-plan[j].start]); if(it.verdict!=='ok') out.bad.push([it.name,it.target,it.measured,lag,spb]); });
+        // everything held full length: short notes (50% goal) must be flagged too long
+        const held=sim(notes,spb,()=>0.98,lag);
+        held.items.forEach(it=>{ if(it.target<=0.55 && it.verdict!=='long') out.bad.push(['held',it.name,it.measured]); if(it.target<=0.55) out.flagged++; });
+      }
+      return out; }""")
+    assert not acc["bad"], acc["bad"][:5]
+    errs = sorted(acc["errs"], reverse=True); mean = sum(e[0] for e in errs)/len(errs)
+    print("mic analysis: mean error", round(mean, 3), "worst", [(round(e[0],3),)+tuple(e[1:]) for e in errs[:4]])
+    assert acc["worst"] < 0.10 and mean < 0.03, (acc["worst"], mean)
+    assert acc["flagged"] > 20, acc
+
     # drawer + dark theme + narrow
     pg.select_option("#inst", "clarinet"); pg.click("#tabArt")
     pg.click("#gear"); pg.screenshot(path=f"{out}/v2-drawer.png"); pg.check("#darkTheme"); pg.click("#drawerClose"); pg.wait_for_timeout(300)
     pg.set_viewport_size({"width": 800, "height": 1000}); pg.screenshot(path=f"{out}/v2-narrow-dark.png", full_page=True)
     pg.close()
+    b.close()
+
+    # ---- full mic flow with Chromium's fake microphone
+    b = p.chromium.launch(channel="chromium", args=["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--autoplay-policy=no-user-gesture-required"])
+    ctx = b.new_context(viewport={"width": 1200, "height": 1100}, permissions=["microphone"])
+    pg = ctx.new_page(); watch(pg)
+    pg.add_init_script("localStorage.setItem('adt.theme', JSON.stringify('light')); localStorage.setItem('adt.tempo','160'); localStorage.setItem('adt.mode', JSON.stringify('art'))")
+    pg.goto(URL); pg.wait_for_selector("#score svg")
+    assert pg.is_visible("#micBtn")
+    pg.click("#micBtn"); assert pg.is_visible("#micUI")
+    pg.click("#micStart"); pg.wait_for_timeout(800)
+    assert "Listening" in pg.inner_text("#micTitle")
+    pg.screenshot(path=f"{out}/mic-listening.png")
+    pg.wait_for_function("!Mic.busy", timeout=15000)
+    title = pg.inner_text("#micTitle")
+    assert "notes in shape" in title or "didn't hear" in title, title
+    assert ev(pg, "Mic.frames.length") > 100, "mic frames captured"
+    pg.screenshot(path=f"{out}/mic-result.png")
+    pg.click("#tabDyn"); assert not pg.is_visible("#micUI") and not pg.is_visible("#micBtn")
     b.close()
 srv.shutdown()
 if errors:

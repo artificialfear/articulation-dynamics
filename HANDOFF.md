@@ -39,6 +39,17 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
 - **Which one?:** the options must differ (articulations: different patterns; dynamics: different contour first). Playback for "which" never highlights notes or shows the cursor, because that would give the answer away.
 - Quiz messages show in `#banner` inside the score card so they're visible in Presentation mode.
 
+## Mic check (js/mic.js)
+- `getUserMedia` with echo cancellation, noise suppression, and auto gain off. A ScriptProcessor collects RMS every 256 samples, timestamped on the AudioContext clock.
+- Only the count-off clicks play during a take; the cursor runs as a visual guide.
+- `analyzeTake()` is pure and covered by the smoke test's synthetic takes (noise, count-off click bleed, 20–140 ms mic lag, 50 ms room-echo tail, 60–140 bpm). Mean error is about 1.5 points, worst under 10; the tolerance is ±15.
+  - The noise floor comes from the count-off bar, skipping the clicks.
+  - The take is lined up using the first attack.
+  - Per event (from `playPlan`), the onset is the first rising edge, or the expected start when a tenuto or slur runs in.
+  - The release is where the level drops below 60% of the note's body (30% for weight+decay notes) for 40 ms. The echo tail is then subtracted, using how fast the tail halves.
+  - A note that never goes quiet before the next note counts as full length.
+- Chromium's fake microphone exercises the whole UI flow in the test.
+
 ## Notes
 - Slurs are only generated with a pattern that moves (a slur over one repeated pitch would look like a tie). The Slur button is disabled when the next note has the same pitch.
 - Articulations go on the notehead side; marcato always goes above.

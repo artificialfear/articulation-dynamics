@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.2.0 — 2026-11-19
+- **🎤 Check my playing** (Articulation mode):
+  - After a count-off, play the measure into the mic. The app measures how long each note sounded and compares it to the Note Shapes guide.
+  - Each note gets "In shape" (within ±15%), "Too long", "Too short", or "Not heard". A blue bar under each green shape shows how long the note actually sounded.
+  - It measures note length only, not attack weight.
+
 ## 2.1.0 — 2026-11-19
 - **Listening Quiz** tab (Articulations or Dynamics):
   - **Name it:** markings are hidden behind "?" marks. Listen and name each note's articulation.
