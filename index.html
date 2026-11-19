@@ -162,7 +162,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
 <script src="lib/vexflow-4.2.5.js"></script>
 <script>
 "use strict";
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const VF = (window.Vex && Vex.Flow) || window.VexFlow;
 document.getElementById("ver").textContent = VERSION;
 
@@ -747,8 +747,10 @@ function play(){
     const L=levelFn(S.dyn.notes);
     S.dyn.notes.forEach((n,i)=>{
       const beats=DUR_BEATS[n.dur], dur=beats*spb, st=t0+n.start*spb;
-      const len=dur*SHAPE.none.sound;
-      voice(st,len,lvlGain(L(n.start)),lvlGain(L(n.start+beats*SHAPE.none.sound)),1);
+      // whole notes sustain 95% so hairpins are heard through them; other notes use the plain 75%
+      const snd = n.dur==="w" ? 0.95 : SHAPE.none.sound;
+      const len=dur*snd;
+      voice(st,len,lvlGain(L(n.start)),lvlGain(L(n.start+beats*snd)),1);
       at(st,()=>highlight(i,true)); at(st+dur*0.95,()=>highlight(i,false));
     });
     at(t0+8*spb+0.05,stopPlayback);

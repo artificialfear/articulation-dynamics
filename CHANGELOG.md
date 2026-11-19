@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.2.1 — 2026-11-19
+- Dynamics mode: whole notes now sustain for 95% of their length. Other notes stay at 75%.
+
 ## 1.2.0 — 2026-11-19
 - New "Build your own rhythm" panel in both modes.
   - Articulation mode: quarter, eighth, and eighth pair. Dynamics mode adds whole and half.
