@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.0.0 — 2026-11-19
+- **Instrument picker:** each student picks their instrument and sees the music in their written key, while playback sounds in concert pitch. Concert-pitch treble and bass options are there for the viewboard, plus Percussion (snare) and Mallets.
+- **Pitch patterns** (⚙ Settings): single concert F or B♭, the concert B♭, F, and E♭ scales, and Remington long tones. Scales show the written key signature, and every instrument stays in a normal middle school range.
+- **Rests, slurs, and ties:**
+  - Random examples can include them; turn each on or off in Settings.
+  - The rhythm builder has rest buttons.
+  - Any note can get "Slur to next" or "Tie to next" (keys S / T) and can be moved up or down with ▲▼ or the arrow keys.
+  - In playback, slurred notes connect with no new attack, and tied notes sound as one note.
+- **Real instrument sounds** for every instrument, with Simple synth available in Settings.
+- **Loudness lane** in Dynamics mode: a green shape under the music shows how loud each note should be.
+- **Share links:** 🔗 Share copies a link to the exact example, and it opens in each student's own key. Good for Brightspace.
+- **Presentation mode** (📽 Present or P): only the music fills the screen, with a floating Play / New / Reveal bar. Reveal (R) shows the shape bars and names.
+- **New look:**
+  - Raven Band logo and a dark header.
+  - Settings moved into a ⚙ drawer.
+  - The symbol guide is collapsed by default and adds slur, tie, and loudness cards.
+
 ## 1.4.0 — 2026-11-19
 - New Full Screen button (top right) or press F. In full screen the music stretches to the full width of the screen. Press Esc, F, or "Exit Full Screen" to leave.
 

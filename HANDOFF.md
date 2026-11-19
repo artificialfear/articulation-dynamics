@@ -1,29 +1,42 @@
 # HANDOFF: Articulation & Dynamics Trainer
 
-Single-page static app for Raven Band students (Chromebooks and the classroom viewboard). Repo: artificialfear/articulation-dynamics, served from GitHub Pages (main branch, root).
+Static GitHub Pages app for Raven Band students (Chromebooks and the classroom viewboard).
+Repo: artificialfear/articulation-dynamics. Live at https://artificialfear.github.io/articulation-dynamics/
 
 ## Files
-- `index.html`: the whole app (CSS and JS inline, so students' devices can't serve a stale cached copy of the app code). Version constant is `VERSION`.
-- `lib/vexflow-4.2.5.js`: bundled locally (no CDN). The filename includes the version, which acts as its cache key.
-- `tests/smoke.py`: Playwright smoke test (`python3 tests/smoke.py . shots`). It stress-tests random generation, checks invariants, takes screenshots, and fails on console errors.
+- `index.html`: markup and CSS. Each script tag has `?v=<VERSION>` so students' devices never run stale code. Bump the version in `js/ui.js` and all the script tags together; the smoke test enforces that they match.
+- `js/theory.js`: instruments (transposition `tr`, warm-up register `bb`, scale tonics `f`/`eb`, Remington/single-F tonic `rf`), pitch patterns, note spelling (`spell`, `noteKey`, `writtenKey`).
+- `js/model.js`: data model, random generation, articulation and dynamics randomizers, `levelFn` (loudness over time), `playPlan` (sound events shared by audio and mic), rhythm builder, share-link encode/decode.
+- `js/render.js`: VexFlow drawing of one example (`renderScore`) plus the icon helpers.
+- `js/audio.js`: Web Audio playback, with samples, synth, snare, metronome, cursor, and highlight.
+- `js/ui.js`: state, panels, settings drawer, share popover, presentation and full screen, keyboard.
+- `js/quiz.js`, `js/mic.js`: Listening Quiz and mic check (see below).
+- `lib/vexflow-4.2.5.js`: bundled locally (no CDN).
+- `assets/raven-logo.png`, `assets/raven-icon.png`: from Mat's Drive ("RAVEN-LOGO-NEW-cropped.png").
+- `assets/sounds/<instrument>/<Note>.mp3`: FluidR3 GM samples (CC BY 3.0, credited in the footer), one every minor 3rd across each instrument's needed range. The app pitch-shifts to the nearest sample and loops 0.6–2.8 s for long notes.
+- `tests/smoke.py`: Playwright test (`python3 tests/smoke.py . shots`). It must print OK before every commit.
 
-## How it works
-- Notation: VexFlow 4. Every note sits on the middle line (treble B4, bass D3, percussion B4) with stems down, and articulations are placed ABOVE, which is the notehead side.
-- Articulation random: each beat is a quarter or two eighths (never all quarters or all eighths). Every articulation in the random pool appears at least once.
-- Dynamics random: markings fall on beats at least 2 beats apart. There are 3 to 4 markings when the rhythm allows, always one in measure 2, and at least one hairpin. A hairpin always heads toward a louder (crescendo) or softer (decrescendo) next marking. `dynWarnings()` flags any hairpin a user sets manually that goes the wrong direction.
-- Hairpins and dynamic glyphs are drawn by hand (VexFlow Glyph plus lines) below the staff. A hairpin runs from its note to the next marked note, or to the end of the example if nothing follows.
-- Articulation lengths and shapes come from Mat's "Note Shapes and Note Lengths" guide (Drive file 15h38mqMMwmSdELsZKgRq--Cfatd0Lpe4) and live in `SHAPE`: tenuto 100% flat, long lifted 75% flat, staccato 50% flat, accent 100% weight+decay, marcato 50% weight+decay. Plain (unmarked) notes use 75%, which Mat chose to match Long Lifted. In Dynamics mode every note sustains 95% instead (`DYN_SUSTAIN`, Mat's request). `shapeMarkup()` draws the green bars for both the score and the reference cards.
-- Articulation mode uses a VexFlow Formatter with softmaxFactor 150 so note spacing is close to proportional and the shape bars line up with the rhythm.
-- Audio: Web Audio, two detuned saws through a lowpass whose cutoff follows loudness. The default pitch is concert F (F4, 349.23 Hz), and the Pitch menu also offers concert B♭ (B♭3). Weight + decay means an attack spike (accent 2.2x, marcato 2.8x) that ramps down to 20% by the end of the sound. Dynamics come from `DYN_GAIN`, and hairpins ramp gain inside each note.
-- Settings (mode, clef, tempo, count-off, labels, random pool, theme) are saved in localStorage, so they are per device.
+## Data model
+Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
+- `p` is a **concert** semitone offset from the pattern's tonic, so one example reads correctly on every instrument and a share link transposes automatically.
+- `sl` means slurred to the next note; `tie` means tied to the next note (same `p`).
+- Articulation mode is 1 measure; Dynamics mode is 2.
 
-- Rhythm builder (`BUILD`, `canAdd`, `addRhythm`): notes are appended in order. Whole notes must start a measure; half notes and eighth pairs must start on a beat; nothing may cross a barline. A single eighth followed by a quarter allows syncopation. `padRests()` fills unfilled beats with grey rests (a whole rest if the measure is empty). Rests are formatted with the notes but aren't part of the data. Note SVG elements are looked up per note with `getSVGElement()` so rests don't throw off the indexing.
+## Decisions Mat made
+- Lengths come from his "Note Shapes and Note Lengths" guide (Drive file 15h38mqMMwmSdELsZKgRq--Cfatd0Lpe4): tenuto 100%, long lifted 75%, staccato 50%, accent 100% weight+decay, marcato 50% weight+decay, unmarked notes 75%.
+- Dynamics mode sustains every note 95%.
+- Default playback pitch is concert F. The metronome and cursor are on by default, and each can be turned off.
+- Long Lifted is off in random mode until checked.
+- Quiz: both whole-class (Reveal) and individual (score).
+- Multiple pitches: instrument selector with written transposition.
+- Patterns: single pitch, the B♭/F/E♭ scales, and Remington.
+- Mic feedback measures note length only.
 
-- Metronome: `click(t, strong, vol)` on every beat of the example (vol 0.55, beat 1 of each measure accented), separate from the count-off. Cursor: an SVG line placed by `beatToX()` from `render.anchors` (beat→x points for every note and padding rest, plus the end barline) and animated with requestAnimationFrame off `AC.currentTime`. `stopPlayback()` removes it.
+## Notes
+- Slurs are only generated with a pattern that moves (a slur over one repeated pitch would look like a tie). The Slur button is disabled when the next note has the same pitch.
+- Articulations go on the notehead side; marcato always goes above.
+- Slurs: VexFlow Curve, with the direction picked from the first note's stem.
+- Settings live in localStorage, so they are per device.
 
-- Full screen: the `#fs` button or the F key calls `requestFullscreen` on the whole page (with a webkit fallback). The `is-fs` class on <html> removes the 1180px max-width so the score fills a wide viewboard. The button hides itself if the browser has no Fullscreen API (iPhone Safari).
-
-## Open items / ideas for later
-- Harder levels: dotted rhythms, sixteenths, rests, ties, slurs, sfz/fp, ppp/fff.
-- Quiz mode (name the symbol, or hear it and pick the right one).
-- Multiple pitches, or the scale of the day.
+## Open items / ideas
+- Harder rhythms (dotted notes, sixteenths), sfz/fp, ppp/fff.

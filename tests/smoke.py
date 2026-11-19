@@ -1,117 +1,146 @@
-"""Smoke test: load the app, exercise both modes, screenshot, fail on console errors.
-Usage: python3 tests/smoke.py [site_dir] [out_dir]"""
-import sys, os, threading, http.server, functools, socketserver
+"""Smoke test for the Articulation & Dynamics Trainer.
+Usage: python3 tests/smoke.py [site_dir] [out_dir]
+Loads the app from a local server, exercises every feature, screenshots, and
+fails on any page error or console error."""
+import sys, os, re, threading, http.server, functools, socketserver
 from playwright.sync_api import sync_playwright
 
-site = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else "site")
+site = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
 out = os.path.abspath(sys.argv[2] if len(sys.argv) > 2 else "shots")
 os.makedirs(out, exist_ok=True)
 H = functools.partial(http.server.SimpleHTTPRequestHandler, directory=site)
-H.log_message = lambda *a: None
-srv = socketserver.TCPServer(("127.0.0.1", 0), H)
+http.server.SimpleHTTPRequestHandler.log_message = lambda *a: None
+socketserver.TCPServer.allow_reuse_address = True
+srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), H)
 port = srv.server_address[1]
 threading.Thread(target=srv.serve_forever, daemon=True).start()
+URL = f"http://127.0.0.1:{port}/index.html"
+
+# every script tag carries ?v=<VERSION> so students never get stale code
+html = open(os.path.join(site, "index.html")).read()
+ver = re.search(r'const VERSION = "([\d.]+)"', open(os.path.join(site, "js/ui.js")).read()).group(1)
+tags = re.findall(r'src="js/[a-z]+\.js\?v=([\d.]+)"', html)
+assert tags and all(t == ver for t in tags), ("script versions", ver, tags)
 
 errors = []
+def watch(pg):
+    pg.on("pageerror", lambda e: errors.append("pageerror: " + str(e)))
+    pg.on("console", lambda m: m.type == "error" and errors.append("console: " + m.text))
+
+def ev(pg, js): return pg.evaluate(js)
+
 with sync_playwright() as p:
-    b = p.chromium.launch(channel="chromium")
-    for theme in ["light", "dark"]:
-        pg = b.new_page(viewport={"width": 1200, "height": 1100})
-        pg.on("pageerror", lambda e: errors.append(str(e)))
-        pg.on("console", lambda m: m.type == "error" and errors.append(m.text))
-        pg.add_init_script(f"localStorage.setItem('adt.theme', JSON.stringify('{theme}'))")
-        pg.goto(f"http://127.0.0.1:{port}/index.html")
-        pg.wait_for_selector("#score svg")
-        if theme == "light":
-            # stress random generation
-            for _ in range(40):
-                pg.click("#aNewAll")
-            n = pg.eval_on_selector_all("#score g.vf-stavenote", "e=>e.length")
-            assert 5 <= n <= 7, n
-            arts = pg.evaluate("S.art.notes.map(n=>n.art)")
-            assert all(a in arts for a in ["stacc", "ten", "acc", "marc"]), arts
-            box = pg.locator("#score svg").bounding_box()
-            nx = pg.evaluate("render.xs[2]/760")
-            pg.mouse.click(box["x"] + box["width"] * nx, box["y"] + box["height"] * 0.4)
-            assert pg.evaluate("S.art.sel") == 2
-            for k in "12345":  # every articulation renders
-                pg.keyboard.press(k)
-                assert pg.evaluate("S.art.notes[2].art") == ["stacc","ten","acc","marc","lift"][int(k)-1]
-            pg.keyboard.press("0")
-            pg.check("#labels")
-            pg.screenshot(path=f"{out}/art-{theme}.png", full_page=True)
-            # rhythm builder (articulation): q, 8, 8-pair, then partial screenshot, then fill
-            pg.click("#aBuild button[data-tool=clear]")
-            assert pg.evaluate("S.art.notes.length") == 0
-            pg.click("#aBuild button[data-code=q]"); pg.click("#aBuild button[data-code='8']")
-            assert pg.is_disabled("#aBuild button[data-code='88']")  # off the beat
-            pg.screenshot(path=f"{out}/build-art-partial.png")
-            pg.click("#aBuild button[data-code='8']"); pg.click("#aBuild button[data-code='88']")
-            pg.click("#aBuild button[data-code=q]")
-            assert pg.evaluate("filled(S.art.notes)") == 4
-            assert pg.is_disabled("#aBuild button[data-code=q]")
-            pg.click("#aBuild button[data-tool=undo]")
-            assert pg.evaluate("filled(S.art.notes)") == 3
-            pg.click("#aBuild button[data-code=q]"); pg.click("#aShuffle")
-            pg.screenshot(path=f"{out}/build-art-full.png")
-            pg.uncheck("#countin")
-            pg.click("#play"); pg.wait_for_timeout(1400)
-            assert pg.locator("#score svg line[stroke='#db2777']").count() == 1
-            x1 = float(pg.get_attribute("#score svg line[stroke='#db2777']", "x1"))
-            pg.screenshot(path=f"{out}/cursor-art.png")
-            pg.wait_for_timeout(600)
-            x2 = float(pg.get_attribute("#score svg line[stroke='#db2777']", "x1"))
-            assert x2 > x1, (x1, x2)
-            pg.click("#play")
-            assert pg.locator("#score svg line[stroke='#db2777']").count() == 0
-            pg.uncheck("#cursor"); pg.click("#play"); pg.wait_for_timeout(300)
-            assert pg.locator("#score svg line[stroke='#db2777']").count() == 0
-            pg.click("#play"); pg.check("#cursor"); pg.check("#countin")
-            # full screen toggles the layout class and button label
-            pg.click("#fs"); pg.wait_for_timeout(400)
-            assert pg.evaluate("!!document.fullscreenElement"), "fullscreen did not engage"
-            assert pg.evaluate("document.documentElement.classList.contains('is-fs')")
-            assert "Exit" in pg.inner_text("#fs")
-            pg.screenshot(path=f"{out}/fullscreen-art.png")
-            pg.keyboard.press("f"); pg.wait_for_timeout(400)
-            assert not pg.evaluate("!!document.fullscreenElement")
-            assert "Full Screen" in pg.inner_text("#fs")
-            pg.click("#tabDyn")
-            for _ in range(60):
-                pg.click("#dNewAll")
-                hp = pg.evaluate("S.dyn.notes.filter(n=>n.hp).length")
-                assert hp >= 1
-                assert pg.evaluate("S.dyn.notes.some(n=>n.m===1&&n.dyn!==null)")
-                assert pg.evaluate("dynWarnings().length") == 0, pg.evaluate("dynWarnings()")
-            # rhythm builder (dynamics): whole, then half+quarter+8th pair, randomize
-            pg.click("#dBuild button[data-tool=clear]")
-            pg.click("#dBuild button[data-code=w]")
-            assert pg.is_disabled("#dBuild button[data-code=w]") is False  # measure 2 can start with whole
-            pg.click("#dBuild button[data-code=h]")
-            assert pg.is_disabled("#dBuild button[data-code=w]")
-            pg.screenshot(path=f"{out}/build-dyn-partial.png")
-            pg.click("#dBuild button[data-code=q]"); pg.click("#dBuild button[data-code='88']")
-            assert pg.evaluate("filled(S.dyn.notes)") == 8
-            pg.click("#dShuffle")
-            assert pg.evaluate("S.dyn.notes.filter(n=>n.hp).length") >= 1
-            pg.screenshot(path=f"{out}/build-dyn-full.png")
-            pg.click("#dNewAll")
-            pg.select_option("#clef", "bass")
-            pg.screenshot(path=f"{out}/dyn-{theme}-labels.png", full_page=True)
-            pg.uncheck("#labels")
-            pg.click("#dNewAll")
-            pg.mouse.click(box["x"] + box["width"] * 0.6, box["y"] + box["height"] * 0.5)
-            pg.screenshot(path=f"{out}/dyn-{theme}.png", full_page=True)
-            pg.uncheck("#countin"); pg.click("#play"); pg.wait_for_timeout(2500)
-            pg.screenshot(path=f"{out}/cursor-dyn.png"); pg.click("#play"); pg.check("#countin")
-            pg.select_option("#clef", "treble")
-        else:
-            pg.screenshot(path=f"{out}/art-{theme}.png", full_page=True)
-        pg.set_viewport_size({"width": 800, "height": 1000})
-        pg.screenshot(path=f"{out}/narrow-{theme}.png", full_page=True)
-        pg.close()
+    b = p.chromium.launch(channel="chromium", args=["--autoplay-policy=no-user-gesture-required"])
+    ctx = b.new_context(viewport={"width": 1200, "height": 1100})
+    pg = ctx.new_page(); watch(pg)
+    pg.add_init_script("localStorage.setItem('adt.theme', JSON.stringify('light'))")
+    pg.goto(URL); pg.wait_for_selector("#score svg")
+    assert ev(pg, "VERSION") == ver
+
+    # ---- every instrument x pattern x mode renders, spelled in a real key
+    res = ev(pg, """()=>{
+      const host=document.createElement('div'); document.body.appendChild(host); let n=0;
+      for(const i of INSTRUMENTS) for(const pat of Object.keys(PATTERNS)) for(const mode of ['art','dyn']){
+        S.inst=i.id; S.pattern=pat; S.artOpt={rests:true,slurs:true,ties:true}; S.dynOpt={rests:true,slurs:true,ties:true};
+        for(let k=0;k<3;k++){ const notes=newExample(mode); renderScore(host,{mode,notes,inst:i,pattern:pat,showArts:true,showDyns:true,labels:true,shapes:true}); n++; }
+      }
+      host.remove(); return n; }""")
+    assert res == 17 * 6 * 2 * 3, res
+
+    # ---- random generation invariants
+    bad = ev(pg, """()=>{
+      const out=[]; S.inst='altosax'; S.pattern='scale_Bb'; S.artOpt={rests:true,slurs:true,ties:true};
+      let slurs=0, ties=0, rests=0;
+      for(let k=0;k<300;k++){
+        const ns=newExample('art');
+        if(filled(ns)!==4) out.push('art not 4 beats');
+        ns.forEach((n,i)=>{ if(n.sl){ slurs++; if(ns[i+1].p===n.p) out.push('slur on same pitch'); if(ns[i+1].rest) out.push('slur into rest'); }
+                            if(n.tie){ ties++; if(ns[i+1].p!==n.p) out.push('tie pitch differs'); }
+                            if(n.rest){ rests++; if(n.art) out.push('art on rest'); } });
+        const el=artEligible(ns), used=new Set(el.map(i=>ns[i].art).filter(Boolean));
+        if(used.size!==Math.min(el.length,4)) out.push('coverage '+used.size+'/'+el.length);
+      }
+      for(let k=0;k<300;k++){
+        const ns=newExample('dyn');
+        if(filled(ns)!==8) out.push('dyn not 8 beats');
+        if(!ns.some(n=>n.hp)) out.push('no hairpin');
+        if(dynWarnings(ns).length) out.push('bad hairpin');
+        if(ns.some(n=>n.rest&&(n.dyn!==null||n.hp))) out.push('dyn on rest');
+      }
+      if(!slurs||!ties||!rests) out.push('features never generated '+[slurs,ties,rests]);
+      return out.slice(0,10); }""")
+    assert not bad, bad
+
+    # ---- restore a normal state and drive the UI
+    pg.goto(URL); pg.wait_for_selector("#score svg")
+    pg.select_option("#inst", "altosax")
+    pg.click("#gear"); pg.select_option("#pattern", "scale_Bb"); pg.click("#drawerClose"); pg.wait_for_timeout(300)
+    pg.click("#aNewAll")
+    assert pg.locator("#score .vf-keysignature").count() == 1, "alto in concert Bb shows a G-major key signature"
+    pg.screenshot(path=f"{out}/v2-art-alto-Bb.png")
+
+    # select a note, apply articulation, tie, pitch change
+    i = ev(pg, "S.art.notes.findIndex((n,i)=>!n.rest && S.art.notes[i+1] && !S.art.notes[i+1].rest)")
+    x = ev(pg, f"R.xs[{i}]/760")
+    box = pg.locator("#score svg").bounding_box()
+    pg.mouse.click(box["x"] + box["width"] * x, box["y"] + box["height"] * 0.45)
+    assert ev(pg, "S.art.sel") == i, (ev(pg, "S.art.sel"), i)
+    pg.keyboard.press("1"); assert ev(pg, f"S.art.notes[{i}].art") == "stacc"
+    pg.keyboard.press("t"); assert ev(pg, f"S.art.notes[{i}].tie") is True
+    assert ev(pg, f"S.art.notes[{i}].p===S.art.notes[{i+1}].p")
+    pg.keyboard.press("t"); pg.keyboard.press("ArrowUp")
+    pg.screenshot(path=f"{out}/v2-art-edit.png")
+
+    # builder with rests
+    pg.click("#aBuild button[data-t=clear]")
+    for c in ["q", "8r", "8", "88", "qr"]:
+        pg.click(f"#aBuild button[data-code='{c}']")
+    assert ev(pg, "filled(S.art.notes)") == 4 and ev(pg, "S.art.notes.filter(n=>n.rest).length") == 2
+    assert pg.is_disabled("#aBuild button[data-code=q]")
+    pg.click("#aShuffle"); pg.screenshot(path=f"{out}/v2-build-rests.png")
+
+    # share link round trip
+    pg.click("#share"); url = pg.input_value("#shareUrl")
+    before = ev(pg, "JSON.stringify(S.art.notes.map(n=>[n.dur,n.rest,n.p,n.art,n.sl,n.tie]))")
+    pg2 = ctx.new_page(); watch(pg2)
+    pg2.goto(url.replace(URL.split("/index.html")[0], f"http://127.0.0.1:{port}")); pg2.wait_for_selector("#score svg")
+    after = ev(pg2, "JSON.stringify(S.art.notes.map(n=>[n.dur,n.rest,n.p,n.art,n.sl,n.tie]))")
+    assert before == after, (before, after)
+    pg2.select_option("#inst", "trumpet"); pg2.screenshot(path=f"{out}/v2-shared-as-trumpet.png"); pg2.close()
+
+    # playback with instrument samples
+    pg.keyboard.press("Escape")
+    pg.click("#play"); pg.wait_for_timeout(2500)
+    assert pg.locator("#score svg line.cursor").count() == 1
+    assert pg.inner_text("#status") == ""
+    assert ev(pg, "Object.keys(sampleCache.alto_sax.map).length") > 5
+    pg.screenshot(path=f"{out}/v2-playing.png")
+    pg.click("#play")
+
+    # presentation mode
+    pg.keyboard.press("p")
+    assert ev(pg, "document.documentElement.classList.contains('present')")
+    assert pg.is_visible("#presentBar") and not pg.is_visible("#transport")
+    pg.screenshot(path=f"{out}/v2-present.png")
+    pg.click("#pReveal"); assert ev(pg, "S.reveal") is True
+    pg.screenshot(path=f"{out}/v2-present-reveal.png")
+    pg.click("#pExit"); assert not ev(pg, "document.documentElement.classList.contains('present')")
+
+    # dynamics with loudness lane, slurs, ties
+    pg.click("#tabDyn"); pg.click("#dNewAll")
+    assert pg.locator("#score svg path[fill='#6cbf3a']").count() >= 2, "loudness lane"
+    pg.check("#labels"); pg.screenshot(path=f"{out}/v2-dyn.png")
+    pg.select_option("#inst", "tuba"); pg.screenshot(path=f"{out}/v2-dyn-tuba.png")
+    pg.select_option("#inst", "perc"); pg.click("#dNewAll"); pg.screenshot(path=f"{out}/v2-dyn-perc.png")
+    pg.click("#play"); pg.wait_for_timeout(800); pg.click("#play")
+
+    # drawer + dark theme + narrow
+    pg.select_option("#inst", "clarinet"); pg.click("#tabArt")
+    pg.click("#gear"); pg.screenshot(path=f"{out}/v2-drawer.png"); pg.check("#darkTheme"); pg.click("#drawerClose"); pg.wait_for_timeout(300)
+    pg.set_viewport_size({"width": 800, "height": 1000}); pg.screenshot(path=f"{out}/v2-narrow-dark.png", full_page=True)
+    pg.close()
     b.close()
 srv.shutdown()
 if errors:
-    print("ERRORS:", *errors, sep="\n  "); sys.exit(1)
+    print("ERRORS:", *errors[:20], sep="\n  "); sys.exit(1)
 print("OK")
