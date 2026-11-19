@@ -40,6 +40,20 @@ with sync_playwright() as p:
             pg.keyboard.press("0")
             pg.check("#labels")
             pg.screenshot(path=f"{out}/art-{theme}.png", full_page=True)
+            # rhythm builder (articulation): q, 8, 8-pair, then partial screenshot, then fill
+            pg.click("#aBuild button[data-tool=clear]")
+            assert pg.evaluate("S.art.notes.length") == 0
+            pg.click("#aBuild button[data-code=q]"); pg.click("#aBuild button[data-code='8']")
+            assert pg.is_disabled("#aBuild button[data-code='88']")  # off the beat
+            pg.screenshot(path=f"{out}/build-art-partial.png")
+            pg.click("#aBuild button[data-code='8']"); pg.click("#aBuild button[data-code='88']")
+            pg.click("#aBuild button[data-code=q]")
+            assert pg.evaluate("filled(S.art.notes)") == 4
+            assert pg.is_disabled("#aBuild button[data-code=q]")
+            pg.click("#aBuild button[data-tool=undo]")
+            assert pg.evaluate("filled(S.art.notes)") == 3
+            pg.click("#aBuild button[data-code=q]"); pg.click("#aShuffle")
+            pg.screenshot(path=f"{out}/build-art-full.png")
             pg.click("#play"); pg.wait_for_timeout(300); pg.click("#play")
             pg.click("#tabDyn")
             for _ in range(60):
@@ -48,6 +62,19 @@ with sync_playwright() as p:
                 assert hp >= 1
                 assert pg.evaluate("S.dyn.notes.some(n=>n.m===1&&n.dyn!==null)")
                 assert pg.evaluate("dynWarnings().length") == 0, pg.evaluate("dynWarnings()")
+            # rhythm builder (dynamics): whole, then half+quarter+8th pair, randomize
+            pg.click("#dBuild button[data-tool=clear]")
+            pg.click("#dBuild button[data-code=w]")
+            assert pg.is_disabled("#dBuild button[data-code=w]") is False  # measure 2 can start with whole
+            pg.click("#dBuild button[data-code=h]")
+            assert pg.is_disabled("#dBuild button[data-code=w]")
+            pg.screenshot(path=f"{out}/build-dyn-partial.png")
+            pg.click("#dBuild button[data-code=q]"); pg.click("#dBuild button[data-code='88']")
+            assert pg.evaluate("filled(S.dyn.notes)") == 8
+            pg.click("#dShuffle")
+            assert pg.evaluate("S.dyn.notes.filter(n=>n.hp).length") >= 1
+            pg.screenshot(path=f"{out}/build-dyn-full.png")
+            pg.click("#dNewAll")
             pg.select_option("#clef", "bass")
             pg.screenshot(path=f"{out}/dyn-{theme}-labels.png", full_page=True)
             pg.uncheck("#labels")

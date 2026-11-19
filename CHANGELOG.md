@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 — 2026-11-19
+- New "Build your own rhythm" panel in both modes.
+  - Articulation mode: quarter, eighth, and eighth pair. Dynamics mode adds whole and half.
+  - Empty beats show as grey rests. A note value that won't fit is greyed out.
+  - Undo and Start over buttons.
+  - When the measure is full, tap notes or press Randomize to add markings.
+- Notes with no marking now play at 75% sound / 25% space (same as Long Lifted). This includes every note in Dynamics mode.
+
 ## 1.1.0 — 2026-11-19
 - Playback now defaults to concert F, with a Pitch menu to switch to concert B♭.
 - Articulations now follow the Raven Band "Note Shapes and Note Lengths" guide. Tenuto is 100% sound, Long Lifted 75%, Staccato 50%. Accent is 100% with weight + decay, and Marcato is 50% with weight + decay. Playback matches each shape.

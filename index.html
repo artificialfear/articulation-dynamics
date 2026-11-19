@@ -47,6 +47,9 @@ input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
 .pal button span.nm{font-size:.8rem;color:var(--muted)}
 .pal button.on{border-color:var(--accent);background:var(--accent-soft)}
 .pal button:disabled{opacity:.4;cursor:default}
+.pal.build button{min-width:70px}
+.pal.build .tool .sym{font-size:1.2rem}
+.pal.build .tool{border-style:dashed}
 .hint{color:var(--muted);font-size:.9rem}
 .warn{color:var(--warn);font-size:.9rem;font-weight:600}
 .pool{display:flex;flex-wrap:wrap;gap:14px}
@@ -112,6 +115,10 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
       <button id="aClear" class="btn">Clear Articulations</button>
     </div>
     <div class="panel">
+      <h3>Build your own rhythm · <span id="aBuildInfo"></span></h3>
+      <div class="pal build" id="aBuild"></div>
+    </div>
+    <div class="panel">
       <h3 id="aSelInfo">Tap a note in the measure to choose its articulation.</h3>
       <div class="pal" id="aPal"></div>
     </div>
@@ -134,6 +141,10 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
       <button id="dClear" class="btn">Clear Dynamics</button>
     </div>
     <div class="panel">
+      <h3>Build your own rhythm · <span id="dBuildInfo"></span></h3>
+      <div class="pal build" id="dBuild"></div>
+    </div>
+    <div class="panel">
       <h3 id="dSelInfo">Tap a note to give it a dynamic or start a hairpin there.</h3>
       <div class="pal" id="dPal"></div>
       <div class="pal" id="hPal" style="margin-top:8px"></div>
@@ -151,7 +162,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
 <script src="lib/vexflow-4.2.5.js"></script>
 <script>
 "use strict";
-const VERSION = "1.1.0";
+const VERSION = "1.2.0";
 const VF = (window.Vex && Vex.Flow) || window.VexFlow;
 document.getElementById("ver").textContent = VERSION;
 
@@ -173,7 +184,7 @@ const ARTS = [
 const ART_BY = Object.fromEntries(ARTS.filter(a=>a.id).map(a=>[a.id,a]));
 /* Note Shapes and Note Lengths guide (Raven Band) */
 const SHAPE = {
-  none:  { sound:0.90, decay:false },
+  none:  { sound:0.75, decay:false },
   ten:   { sound:1.00, decay:false, pct:"100% Sound / 0% Space" },
   lift:  { sound:0.75, decay:false, pct:"75% Sound / 25% Space" },
   stacc: { sound:0.50, decay:false, pct:"50% Sound / 50% Space" },
@@ -276,12 +287,14 @@ function dynNewRhythm(){
 function dynRandomize(){
   const notes = S.dyn.notes;
   notes.forEach(n=>{n.dyn=null;n.hp=null;});
+  if(!notes.length) return;
   // candidate onsets on whole beats, keep at least 2 beats apart
   const target = 3 + rnd(2); // aim for 3-4 markings
   const chosen = [0];
   const onBeat = notes.map((n,i)=>i).filter(i=>i>0 && Number.isInteger(notes[i].start));
   // always put at least one marking in measure 2
-  chosen.push(pick(onBeat.filter(i=>notes[i].start>=4 && notes[i].start<=6)));
+  const m2 = onBeat.filter(i=>notes[i].start>=4 && notes[i].start<=6);
+  if(m2.length) chosen.push(pick(m2));
   const cands = shuffle(onBeat.filter(i=>!chosen.includes(i)));
   for(const i of cands){
     if(chosen.length>=target) break;
@@ -349,14 +362,34 @@ function newRenderer(W,H){
   svg.style.width="100%"; svg.style.height="auto";
   return {ctx,svg};
 }
-function drawMeasure(ctx,x,y,w,notesData,first,last){
+// Grey rests fill any beats the rhythm builder hasn't filled yet
+function padRests(notesData,offset=0){
+  let pos=notesData.reduce((t,n)=>t+DUR_BEATS[n.dur],0);
+  const out=[];
+  if(pos===0){ out.push({dur:"w",start:offset}); return out; }
+  if(pos%1){ out.push({dur:"8",start:offset+pos}); pos+=0.5; }
+  while(pos<4){ out.push({dur:"q",start:offset+pos}); pos+=1; }
+  return out;
+}
+function makeRest(r){
+  const bass=S.clef==="bass";
+  const key = r.dur==="w" ? (bass?"f/3":"d/5") : (bass?"d/3":"b/4");
+  const sn=new VF.StaveNote({clef:S.clef, keys:[key], duration:r.dur+"r"});
+  sn.setStyle({fillStyle:"#b5b9c4",strokeStyle:"#b5b9c4"});
+  return sn;
+}
+const beamsFor = vfn => vfn.length? VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true}) : [];
+function drawMeasure(ctx,x,y,w,notesData,first,last,offset){
   const stave = new VF.Stave(x,y,w);
   if(first){ stave.addClef(S.clef).addTimeSignature("4/4"); }
   if(last) stave.setEndBarType(VF.Barline.type.END);
   stave.setContext(ctx).draw();
   const vfn = notesData.map(makeNote);
-  const beams = VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true});
-  VF.Formatter.FormatAndDraw(ctx,stave,vfn,{auto_beam:false});
+  const rests = padRests(notesData,offset).map(makeRest);
+  const beams = beamsFor(vfn);
+  const voice=new VF.Voice({num_beats:4,beat_value:4}).addTickables(vfn.concat(rests));
+  new VF.Formatter().joinVoices([voice]).formatToStave([voice],stave);
+  voice.draw(ctx,stave);
   beams.forEach(b=>b.setContext(ctx).draw());
   return {stave,vfn};
 }
@@ -375,22 +408,25 @@ function renderArt(){
     if(n.art){ ART_BY[n.art].codes.forEach(c=>sn.addModifier(new VF.Articulation(c).setPosition(VF.Modifier.Position.ABOVE),0)); }
     return sn;
   });
-  const beams = VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true});
+  const restSpecs=padRests(data), rests=restSpecs.map(makeRest);
+  const beams = beamsFor(vfn);
   // near-proportional spacing so the note-shape bars line up with the rhythm
-  const voiceA=new VF.Voice({num_beats:4,beat_value:4}).addTickables(vfn);
+  const voiceA=new VF.Voice({num_beats:4,beat_value:4}).addTickables(vfn.concat(rests));
   new VF.Formatter({softmaxFactor:150}).joinVoices([voiceA]).formatToStave([voiceA],stave);
   voiceA.draw(ctx,stave);
   beams.forEach(b=>b.setContext(ctx).draw());
-  const els=[...svg.querySelectorAll("g.vf-stavenote")];
+  const els=vfn.map(sn=>sn.getSVGElement());
   const xs=vfn.map(noteCenter);
-  const lefts=vfn.map(sn=>sn.getNoteHeadBeginX());
-  const last=data.length-1, unit=(lefts[last]-lefts[0])/Math.max(0.5,data[last].start);
+  const allLefts=vfn.concat(rests).map(sn=>sn.getNoteHeadBeginX());
+  const lefts=allLefts.slice(0,vfn.length);
+  const items=data.concat(restSpecs), lastAll=items.length-1;
+  const unit=lastAll>0? (allLefts[lastAll]-allLefts[0])/Math.max(0.5,items[lastAll].start) : 60;
   let ly = stave.getYForLine(4)+58;
   if(S.shapes){
     const y0=stave.getYForLine(4)+44, h=20, endX=stave.getX()+stave.getWidth()-12;
     let m="";
     data.forEach((n,i)=>{
-      const x=lefts[i]-3, x2=(i<last? lefts[i+1]-9 : Math.min(endX, lefts[i]+DUR_BEATS[n.dur]*unit-9));
+      const x=lefts[i]-3, x2=(i<lastAll? allLefts[i+1]-9 : Math.min(endX, lefts[i]+DUR_BEATS[n.dur]*unit-9));
       m+=shapeMarkup(x,y0,Math.max(14,x2-x),h,n.art);
     });
     const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","shapes");
@@ -409,10 +445,10 @@ function renderDyn(){
   const {ctx,svg}=newRenderer(W,H);
   const data=S.dyn.notes;
   const m1=data.filter(n=>n.m===0), m2=data.filter(n=>n.m===1);
-  const A=drawMeasure(ctx,10,-10,505,m1,true,false);
-  const B=drawMeasure(ctx,515,-10,475,m2,false,true);
+  const A=drawMeasure(ctx,10,-10,505,m1,true,false,0);
+  const B=drawMeasure(ctx,515,-10,475,m2,false,true,4);
   const vfn=A.vfn.concat(B.vfn);
-  const els=[...svg.querySelectorAll("g.vf-stavenote")];
+  const els=vfn.map(sn=>sn.getSVGElement());
   const xs=vfn.map(noteCenter);
   const lefts=vfn.map(sn=>sn.getNoteHeadBeginX());
   const dy = A.stave.getYForLine(4)+58; // dynamics baseline
@@ -453,7 +489,7 @@ function renderDyn(){
 function applySel(){
   if(!render) return;
   const st = S.mode==="art"? S.art : S.dyn;
-  render.els.forEach((el,i)=>el.classList.toggle("sel",i===st.sel));
+  render.els.forEach((el,i)=>el&&el.classList.toggle("sel",i===st.sel));
 }
 function draw(){ stopPlayback(); if(S.mode==="art") renderArt(); else renderDyn(); updatePalettes(); }
 
@@ -468,6 +504,52 @@ $("score").addEventListener("click",e=>{
   st.sel = (st.sel===best)? -1 : best;
   applySel(); updatePalettes();
 });
+
+/* ---------- rhythm builder ---------- */
+const BUILD = {
+  art: [["q","Quarter"],["8","Eighth"],["88","Eighth pair"]],
+  dyn: [["w","Whole"],["h","Half"],["q","Quarter"],["8","Eighth"],["88","Eighth pair"]],
+};
+const stOf = mode => mode==="art"? S.art : S.dyn;
+const totalBeats = mode => mode==="art"? 4 : 8;
+const filled = notes => notes.reduce((t,n)=>t+DUR_BEATS[n.dur],0);
+const fmtBeats = b => b%1 ? (Math.floor(b)||"")+"½" : String(b);
+function canAdd(mode,code){
+  const pos=filled(stOf(mode).notes);
+  if(pos>=totalBeats(mode)) return false;
+  const inM=pos%4, beats = code==="88"?1:DUR_BEATS[code];
+  if(inM+beats>4) return false;                      // must fit in the current measure
+  if(code==="w" && inM!==0) return false;            // whole note starts the measure
+  if((code==="h"||code==="88") && inM%1) return false; // half notes / eighth pairs start on a beat
+  return true;
+}
+function addRhythm(mode,code){
+  if(!canAdd(mode,code)) return;
+  const st=stOf(mode), pos=filled(st.notes);
+  const mk=(dur,start)=> mode==="art"? {dur,start,art:null} : {dur,start,m:Math.floor(start/4),dyn:null,hp:null};
+  if(code==="88") st.notes.push(mk("8",pos),mk("8",pos+0.5)); else st.notes.push(mk(code,pos));
+  st.sel=-1; draw();
+}
+function undoRhythm(mode){ const st=stOf(mode); st.notes.pop(); st.sel=-1; draw(); }
+function clearRhythm(mode){ const st=stOf(mode); st.notes=[]; st.sel=-1; draw(); }
+const rhythmIcon = code => glyphSVG(ctx=>{
+  const st=new VF.Stave(0,40,code==="88"?110:80,{left_bar:false,right_bar:false}); st.options.num_lines=0;
+  const durs = code==="88"? ["8","8"] : [code];
+  const ns=durs.map(d=>new VF.StaveNote({keys:["b/4"],duration:d,stem_direction:-1}));
+  const bm=code==="88"? [new VF.Beam(ns)] : [];
+  st.setContext(ctx); VF.Formatter.FormatAndDraw(ctx,st,ns); bm.forEach(b=>b.setContext(ctx).draw());
+},10,10,0.55);
+function updateBuild(){
+  const mode=S.mode, notes=stOf(mode).notes, pos=filled(notes), tot=totalBeats(mode);
+  const info = pos>=tot
+    ? (mode==="art"? "measure is full — tap notes or Randomize to add articulations" : "both measures are full — tap notes or Randomize to add dynamics")
+    : `${fmtBeats(pos)} of ${tot} beats filled`;
+  $(mode==="art"?"aBuildInfo":"dBuildInfo").textContent=info;
+  [...$(mode==="art"?"aBuild":"dBuild").children].forEach(b=>{
+    if(b.dataset.code) b.disabled=!canAdd(mode,b.dataset.code);
+    if(b.dataset.tool) b.disabled=!notes.length;
+  });
+}
 
 /* ---------- palettes & reference cards ---------- */
 // Renders a single music glyph to a tightly-cropped SVG string
@@ -507,6 +589,20 @@ function buildStatic(){
     b.innerHTML=`<span class="sym">${a.id?artGlyph(a.id):NONE_SYM}</span><span class="nm">${k}·${a.name}</span>`;
     b.onclick=()=>setArt(a.id); ap.appendChild(b);
   });
+  // rhythm builders
+  ["art","dyn"].forEach(mode=>{
+    const host=$(mode==="art"?"aBuild":"dBuild"); host.innerHTML="";
+    BUILD[mode].forEach(([code,nm])=>{
+      const b=document.createElement("button"); b.dataset.code=code;
+      b.innerHTML=`<span class="sym">${rhythmIcon(code)}</span><span class="nm">${nm}</span>`;
+      b.onclick=()=>addRhythm(mode,code); host.appendChild(b);
+    });
+    [["undo","⌫","Undo"],["clear","✕","Start over"]].forEach(([t,sym,nm])=>{
+      const b=document.createElement("button"); b.dataset.tool=t; b.className="tool";
+      b.innerHTML=`<span class="sym">${sym}</span><span class="nm">${nm}</span>`;
+      b.onclick=()=> t==="undo"? undoRhythm(mode) : clearRhythm(mode); host.appendChild(b);
+    });
+  });
   // pool
   const pool=$("aPool"); pool.innerHTML="";
   [["stacc","Staccato"],["ten","Tenuto"],["acc","Accent"],["marc","Marcato"],["lift","Long Lifted"],["none","Plain notes (no articulation)"]].forEach(([k,nm])=>{
@@ -541,6 +637,7 @@ function buildStatic(){
   dr.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${hairGlyph("dim")}</div><div><b>Decrescendo</b><p>Gradually get softer (also called diminuendo). Keep your tone supported.</p></div></div>`);
 }
 function updatePalettes(){
+  updateBuild();
   if(S.mode==="art"){
     const sel=S.art.sel, n=S.art.notes[sel];
     $("aSelInfo").textContent = n? `Note ${sel+1} of ${S.art.notes.length} selected — choose its articulation (keys 0–5, ←/→ to move).` : "Tap a note in the measure to choose its articulation.";
@@ -650,8 +747,8 @@ function play(){
     const L=levelFn(S.dyn.notes);
     S.dyn.notes.forEach((n,i)=>{
       const beats=DUR_BEATS[n.dur], dur=beats*spb, st=t0+n.start*spb;
-      const len=dur*0.94;
-      voice(st,len,lvlGain(L(n.start)),lvlGain(L(n.start+beats*0.94)),1);
+      const len=dur*SHAPE.none.sound;
+      voice(st,len,lvlGain(L(n.start)),lvlGain(L(n.start+beats*SHAPE.none.sound)),1);
       at(st,()=>highlight(i,true)); at(st+dur*0.95,()=>highlight(i,false));
     });
     at(t0+8*spb+0.05,stopPlayback);
@@ -661,7 +758,7 @@ function stopPlayback(){
   timers.forEach(clearTimeout); timers=[];
   if(AC){ const now=AC.currentTime; live.forEach(o=>{ try{o.stop(now);}catch(e){} }); }
   live=[]; playing=false; $("play").textContent="▶ Play";
-  if(render) render.els.forEach(el=>el.classList.remove("play"));
+  if(render) render.els.forEach(el=>el&&el.classList.remove("play"));
 }
 
 /* ================= WIRING ================= */
