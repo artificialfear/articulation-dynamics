@@ -29,6 +29,9 @@ select,.btn{background:var(--panel);border:1px solid var(--line);border-radius:8
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
 .btn:disabled{opacity:.45;cursor:default}
 main{max-width:1180px;margin:0 auto;padding:16px 18px 40px}
+/* full screen: let the music use the whole viewboard width */
+html.is-fs main{max-width:none;padding:14px 28px 40px}
+html.is-fs body{overflow-y:auto}
 .paper{background:var(--paper);border-radius:14px;border:1px solid var(--line);padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
 .paper svg{display:block;width:100%;height:auto;touch-action:manipulation;cursor:pointer}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
@@ -89,6 +92,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
       <option value="percussion">Percussion clef</option>
     </select>
     <button id="theme" class="btn" title="Light / dark mode">🌙</button>
+    <button id="fs" class="btn" title="Full screen (F)">⛶ Full Screen</button>
   </div>
 </header>
 
@@ -105,7 +109,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
     <label id="shapesWrap"><input id="shapes" type="checkbox"> Show note shapes</label>
     <label>Pitch <select id="pitch"><option value="F">Concert F</option><option value="Bb">Concert B♭</option></select></label>
     <span class="grow"></span>
-    <span class="hint">Space = play · N = new · Tap a note to edit it</span>
+    <span class="hint">Space = play · N = new · F = full screen · Tap a note to edit it</span>
   </div>
 
   <!-- ARTICULATION MODE -->
@@ -164,7 +168,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
 <script src="lib/vexflow-4.2.5.js"></script>
 <script>
 "use strict";
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const VF = (window.Vex && Vex.Flow) || window.VexFlow;
 document.getElementById("ver").textContent = VERSION;
 
@@ -841,9 +845,27 @@ function applyTheme(t){ document.documentElement.dataset.theme=t; store.set("the
 applyTheme(store.get("theme", matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 $("theme").onclick=()=>applyTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
 
+/* ---------- full screen ---------- */
+const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+function toggleFullscreen(){
+  const de=document.documentElement;
+  if(fsEl()){ (document.exitFullscreen||document.webkitExitFullscreen).call(document); }
+  else { const req=de.requestFullscreen||de.webkitRequestFullscreen; if(req) Promise.resolve(req.call(de)).catch(()=>{}); }
+}
+function onFsChange(){
+  const on=!!fsEl();
+  document.documentElement.classList.toggle("is-fs",on);
+  $("fs").textContent = on? "✕ Exit Full Screen" : "⛶ Full Screen";
+}
+document.addEventListener("fullscreenchange",onFsChange);
+document.addEventListener("webkitfullscreenchange",onFsChange);
+if(!(document.documentElement.requestFullscreen||document.documentElement.webkitRequestFullscreen)) $("fs").classList.add("hidden");
+$("fs").onclick=toggleFullscreen;
+
 document.addEventListener("keydown",e=>{
   if(e.target.tagName==="INPUT"&&e.target.type!=="checkbox"&&e.target.type!=="range") return;
   if(e.key===" "){ e.preventDefault(); play(); return; }
+  if(e.key==="f"||e.key==="F"){ toggleFullscreen(); return; }
   if(e.key==="n"||e.key==="N"){ (S.mode==="art"?$("aNewAll"):$("dNewAll")).click(); return; }
   if(e.key==="Escape"){ (S.mode==="art"?S.art:S.dyn).sel=-1; applySel(); updatePalettes(); return; }
   const st=S.mode==="art"?S.art:S.dyn;

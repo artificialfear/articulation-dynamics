@@ -21,6 +21,8 @@ Single-page static app for Raven Band students (Chromebooks and the classroom vi
 
 - Metronome: `click(t, strong, vol)` on every beat of the example (vol 0.55, beat 1 of each measure accented), separate from the count-off. Cursor: an SVG line placed by `beatToX()` from `render.anchors` (beat→x points for every note and padding rest, plus the end barline) and animated with requestAnimationFrame off `AC.currentTime`. `stopPlayback()` removes it.
 
+- Full screen: the `#fs` button or the F key calls `requestFullscreen` on the whole page (with a webkit fallback). The `is-fs` class on <html> removes the 1180px max-width so the score fills a wide viewboard. The button hides itself if the browser has no Fullscreen API (iPhone Safari).
+
 ## Open items / ideas for later
 - Harder levels: dotted rhythms, sixteenths, rests, ties, slurs, sfz/fp, ppp/fff.
 - Quiz mode (name the symbol, or hear it and pick the right one).

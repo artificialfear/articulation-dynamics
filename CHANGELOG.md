@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.0 — 2026-11-19
+- New Full Screen button (top right) or press F. In full screen the music stretches to the full width of the screen. Press Esc, F, or "Exit Full Screen" to leave.
+
 ## 1.3.0 — 2026-11-19
 - Dynamics mode: every note now sustains for 95% of its value.
 - New Metronome option: clicks on every beat during playback, with a stronger click on beat 1 of each measure. It's softer than the count-off.

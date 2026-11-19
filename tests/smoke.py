@@ -67,6 +67,15 @@ with sync_playwright() as p:
             pg.uncheck("#cursor"); pg.click("#play"); pg.wait_for_timeout(300)
             assert pg.locator("#score svg line[stroke='#db2777']").count() == 0
             pg.click("#play"); pg.check("#cursor"); pg.check("#countin")
+            # full screen toggles the layout class and button label
+            pg.click("#fs"); pg.wait_for_timeout(400)
+            assert pg.evaluate("!!document.fullscreenElement"), "fullscreen did not engage"
+            assert pg.evaluate("document.documentElement.classList.contains('is-fs')")
+            assert "Exit" in pg.inner_text("#fs")
+            pg.screenshot(path=f"{out}/fullscreen-art.png")
+            pg.keyboard.press("f"); pg.wait_for_timeout(400)
+            assert not pg.evaluate("!!document.fullscreenElement")
+            assert "Full Screen" in pg.inner_text("#fs")
             pg.click("#tabDyn")
             for _ in range(60):
                 pg.click("#dNewAll")
