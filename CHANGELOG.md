@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0 — 2026-11-19
+- Dynamics mode: every note now sustains for 95% of its value.
+- New Metronome option: clicks on every beat during playback, with a stronger click on beat 1 of each measure. It's softer than the count-off.
+- New Cursor option: a pink line sweeps through the music in time with playback and lands on each note as it sounds.
+- Both are on by default and can be turned off with checkboxes next to Count-off. The setting is saved on each device.
+
 ## 1.2.1 — 2026-11-19
 - Dynamics mode: whole notes now sustain for 95% of their length. Other notes stay at 75%.
 

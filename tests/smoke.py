@@ -54,7 +54,19 @@ with sync_playwright() as p:
             assert pg.evaluate("filled(S.art.notes)") == 3
             pg.click("#aBuild button[data-code=q]"); pg.click("#aShuffle")
             pg.screenshot(path=f"{out}/build-art-full.png")
-            pg.click("#play"); pg.wait_for_timeout(300); pg.click("#play")
+            pg.uncheck("#countin")
+            pg.click("#play"); pg.wait_for_timeout(1400)
+            assert pg.locator("#score svg line[stroke='#db2777']").count() == 1
+            x1 = float(pg.get_attribute("#score svg line[stroke='#db2777']", "x1"))
+            pg.screenshot(path=f"{out}/cursor-art.png")
+            pg.wait_for_timeout(600)
+            x2 = float(pg.get_attribute("#score svg line[stroke='#db2777']", "x1"))
+            assert x2 > x1, (x1, x2)
+            pg.click("#play")
+            assert pg.locator("#score svg line[stroke='#db2777']").count() == 0
+            pg.uncheck("#cursor"); pg.click("#play"); pg.wait_for_timeout(300)
+            assert pg.locator("#score svg line[stroke='#db2777']").count() == 0
+            pg.click("#play"); pg.check("#cursor"); pg.check("#countin")
             pg.click("#tabDyn")
             for _ in range(60):
                 pg.click("#dNewAll")
@@ -81,7 +93,8 @@ with sync_playwright() as p:
             pg.click("#dNewAll")
             pg.mouse.click(box["x"] + box["width"] * 0.6, box["y"] + box["height"] * 0.5)
             pg.screenshot(path=f"{out}/dyn-{theme}.png", full_page=True)
-            pg.click("#play"); pg.wait_for_timeout(300); pg.click("#play")
+            pg.uncheck("#countin"); pg.click("#play"); pg.wait_for_timeout(2500)
+            pg.screenshot(path=f"{out}/cursor-dyn.png"); pg.click("#play"); pg.check("#countin")
             pg.select_option("#clef", "treble")
         else:
             pg.screenshot(path=f"{out}/art-{theme}.png", full_page=True)
