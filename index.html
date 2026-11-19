@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22%3E%3Ctext y=%22.9em%22 font-size=%2290%22%3E%F0%9F%8E%BA%3C/text%3E%3C/svg%3E">
+<title>Articulation & Dynamics Trainer · Raven Band</title>
+<style>
+:root{
+  --bg:#f3f4f7; --panel:#ffffff; --ink:#1b1d24; --muted:#5d6475; --line:#d9dce4;
+  --accent:#6d28d9; --accent-ink:#fff; --accent-soft:#ede7fb; --warn:#b45309; --paper:#ffffff;
+}
+[data-theme="dark"]{
+  --bg:#14151b; --panel:#1e2029; --ink:#eceef4; --muted:#a0a6b6; --line:#343745;
+  --accent:#a78bfa; --accent-ink:#17121f; --accent-soft:#2c2540; --warn:#fbbf24; --paper:#fbfbf8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,select,input{font:inherit;color:inherit}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--line)}
+header h1{font-size:1.15rem;margin:0;margin-right:auto;white-space:nowrap}
+header h1 small{display:block;font-size:.75rem;font-weight:500;color:var(--muted)}
+.tabs{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:transparent;padding:8px 16px;border-radius:8px;cursor:pointer;font-weight:600;color:var(--muted)}
+.tabs button.on{background:var(--accent);color:var(--accent-ink)}
+.hdr-ctl{display:flex;gap:8px;align-items:center}
+select,.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 12px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+.btn:disabled{opacity:.45;cursor:default}
+main{max-width:1180px;margin:0 auto;padding:16px 18px 40px}
+.paper{background:var(--paper);border-radius:14px;border:1px solid var(--line);padding:10px 12px;box-shadow:0 2px 10px rgba(0,0,0,.06)}
+.paper svg{display:block;width:100%;height:auto;touch-action:manipulation;cursor:pointer}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:12px}
+.row .grow{flex:1}
+.transport{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px}
+.transport label{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:.92rem}
+#tempo{width:150px;accent-color:var(--accent)}
+#tempoVal{font-weight:700;color:var(--ink);min-width:3.5em}
+input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
+.panel h3{margin:0 0 8px;font-size:.95rem;color:var(--muted);font-weight:600}
+.pal{display:flex;flex-wrap:wrap;gap:8px}
+.pal button{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:78px;padding:6px 10px;border:2px solid var(--line);border-radius:10px;background:var(--panel);cursor:pointer}
+.pal button .sym{height:30px;display:flex;align-items:center;justify-content:center}
+[data-theme="dark"] .pal .sym svg{filter:invert(1)}
+.pal button span.nm{font-size:.8rem;color:var(--muted)}
+.pal button.on{border-color:var(--accent);background:var(--accent-soft)}
+.pal button:disabled{opacity:.4;cursor:default}
+.hint{color:var(--muted);font-size:.9rem}
+.warn{color:var(--warn);font-size:.9rem;font-weight:600}
+.pool{display:flex;flex-wrap:wrap;gap:14px}
+.pool label{display:flex;gap:6px;align-items:center}
+.refs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:12px}
+.ref{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;gap:12px;align-items:flex-start}
+.ref .sym{flex:0 0 58px;height:46px;background:var(--paper);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.ref .sym svg{max-height:40px;max-width:52px}
+.ref b{display:block}
+.ref p{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+details.refwrap{margin-top:14px}
+details.refwrap summary{cursor:pointer;font-weight:600;color:var(--muted)}
+.hidden{display:none!important}
+/* notation highlight */
+.vf-stavenote.sel path,.vf-stavenote.sel rect{fill:#2563eb;stroke:#2563eb}
+.vf-stavenote.play path,.vf-stavenote.play rect{fill:#db2777;stroke:#db2777}
+g.dyn.sel path{fill:#2563eb}
+footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
+@media (max-width:700px){header h1{width:100%}.pal button{min-width:64px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Articulation &amp; Dynamics Trainer<small>Raven Band</small></h1>
+  <div class="tabs" role="tablist">
+    <button id="tabArt" class="on">Articulation</button>
+    <button id="tabDyn">Dynamics</button>
+  </div>
+  <div class="hdr-ctl">
+    <select id="clef" title="Clef">
+      <option value="treble">Treble clef</option>
+      <option value="bass">Bass clef</option>
+      <option value="percussion">Percussion clef</option>
+    </select>
+    <button id="theme" class="btn" title="Light / dark mode">🌙</button>
+  </div>
+</header>
+
+<main>
+  <div class="paper"><div id="score"></div></div>
+
+  <div class="row transport">
+    <button id="play" class="btn primary">▶ Play</button>
+    <label>Tempo <input id="tempo" type="range" min="50" max="160" step="2" value="80"> <span id="tempoVal">80</span></label>
+    <label><input id="countin" type="checkbox" checked> Count-off</label>
+    <label><input id="labels" type="checkbox"> Show names</label>
+    <span class="grow"></span>
+    <span class="hint">Space = play · N = new · Tap a note to edit it</span>
+  </div>
+
+  <!-- ARTICULATION MODE -->
+  <section id="artUI">
+    <div class="row">
+      <button id="aNewAll" class="btn primary">🎲 New Example</button>
+      <button id="aNewRhythm" class="btn">New Rhythm</button>
+      <button id="aShuffle" class="btn">Randomize Articulations</button>
+      <button id="aClear" class="btn">Clear Articulations</button>
+    </div>
+    <div class="panel">
+      <h3 id="aSelInfo">Tap a note in the measure to choose its articulation.</h3>
+      <div class="pal" id="aPal"></div>
+    </div>
+    <div class="panel">
+      <h3>Random mode uses</h3>
+      <div class="pool" id="aPool"></div>
+    </div>
+    <details class="refwrap" open>
+      <summary>What each symbol means</summary>
+      <div class="refs" id="aRefs"></div>
+    </details>
+  </section>
+
+  <!-- DYNAMICS MODE -->
+  <section id="dynUI" class="hidden">
+    <div class="row">
+      <button id="dNewAll" class="btn primary">🎲 New Example</button>
+      <button id="dNewRhythm" class="btn">New Rhythm</button>
+      <button id="dShuffle" class="btn">Randomize Dynamics</button>
+      <button id="dClear" class="btn">Clear Dynamics</button>
+    </div>
+    <div class="panel">
+      <h3 id="dSelInfo">Tap a note to give it a dynamic or start a hairpin there.</h3>
+      <div class="pal" id="dPal"></div>
+      <div class="pal" id="hPal" style="margin-top:8px"></div>
+      <div id="dWarn" class="warn" style="margin-top:8px"></div>
+      <div class="hint" style="margin-top:6px">A hairpin runs from its note to the next dynamic marking.</div>
+    </div>
+    <details class="refwrap" open>
+      <summary>What each marking means</summary>
+      <div class="refs" id="dRefs"></div>
+    </details>
+  </section>
+  <footer>v<span id="ver"></span> · Notation by VexFlow</footer>
+</main>
+
+<script src="lib/vexflow-4.2.5.js"></script>
+<script>
+"use strict";
+const VERSION = "1.0.0";
+const VF = (window.Vex && Vex.Flow) || window.VexFlow;
+document.getElementById("ver").textContent = VERSION;
+
+/* ---------- storage (per device) ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem("adt."+k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem("adt."+k, JSON.stringify(v)); }catch(e){} }
+};
+
+/* ---------- constants ---------- */
+const ARTS = [
+  { id:null,   name:"None",     code:null },
+  { id:"stacc",name:"Staccato", code:"a.", glyph:"articStaccatoAbove" },
+  { id:"ten",  name:"Tenuto",   code:"a-", glyph:"articTenutoAbove" },
+  { id:"acc",  name:"Accent",   code:"a>", glyph:"articAccentAbove" },
+  { id:"marc", name:"Marcato",  code:"a^", glyph:"articMarcatoAbove" },
+];
+const ART_BY = Object.fromEntries(ARTS.filter(a=>a.id).map(a=>[a.id,a]));
+const ART_REF = {
+  stacc:["Staccato","Dot above or below the note. Short and separated — about half the written length. Light, not heavy."],
+  ten:["Tenuto","Line above or below the note. Hold it for its full value with full weight, connected to the next note."],
+  acc:["Accent","Wedge (>). Strong attack at the start, then back off to the dynamic. Keep the note its full length."],
+  marc:["Marcato","Rooftop (^). The strongest accent: a heavier attack, louder and a bit more separated than >."],
+};
+const DYNS = ["pp","p","mp","mf","f","ff"];
+const DYN_NAME = { pp:"pianissimo", p:"piano", mp:"mezzo piano", mf:"mezzo forte", f:"forte", ff:"fortissimo" };
+const DYN_MEAN = { pp:"Very soft", p:"Soft", mp:"Medium soft", mf:"Medium loud", f:"Loud", ff:"Very loud" };
+const DYN_GLYPH = { p:"dynamicPiano", m:"dynamicMezzo", f:"dynamicForte" };
+const DYN_GAIN = [0.05, 0.10, 0.17, 0.26, 0.40, 0.58];
+const KEY = { treble:"b/4", bass:"d/3", percussion:"b/4" };
+const DUR_BEATS = { w:4, h:2, q:1, "8":0.5 };
+
+/* ---------- helpers ---------- */
+const $ = id => document.getElementById(id);
+const rnd = n => Math.floor(Math.random()*n);
+const pick = arr => arr[rnd(arr.length)];
+const shuffle = a => { for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+function weighted(opts){ const t=opts.reduce((s,o)=>s+o[1],0); let r=Math.random()*t; for(const o of opts){ if((r-=o[1])<0) return o[0]; } return opts[0][0]; }
+
+/* ---------- state ---------- */
+const S = {
+  mode: store.get("mode","art"),
+  clef: store.get("clef","treble"),
+  tempo: store.get("tempo",80),
+  countin: store.get("countin",true),
+  labels: store.get("labels",false),
+  pool: store.get("pool",{stacc:true,ten:true,acc:true,marc:true,none:false}),
+  art: { notes:[], sel:-1 },
+  dyn: { notes:[], sel:-1 },
+};
+let render = null; // last render info: {svg, noteEls, notes(VF), coords}
+
+/* ================= ARTICULATION MODE ================= */
+function artNewRhythm(){
+  const notes = [];
+  for(let b=0;b<4;b++){
+    if(Math.random()<0.5) notes.push({dur:"q", start:b});
+    else { notes.push({dur:"8", start:b}); notes.push({dur:"8", start:b+0.5}); }
+  }
+  // make sure there are at least a couple of eighth pairs and a quarter for variety
+  if(notes.length===4){ const b=rnd(4); notes.splice(b,1,{dur:"8",start:b},{dur:"8",start:b+0.5}); }
+  if(notes.length===8){ return artNewRhythm(); }
+  notes.forEach(n=>n.art=null);
+  S.art.notes = notes; S.art.sel = -1;
+}
+function artRandomize(){
+  const pool = ["stacc","ten","acc","marc"].filter(k=>S.pool[k]);
+  const allowNone = S.pool.none || pool.length===0;
+  const n = S.art.notes.length;
+  // every enabled articulation appears at least once (when there are enough notes)
+  let seq = shuffle(pool.slice()).slice(0, n);
+  const fill = allowNone ? pool.concat([null]) : pool;
+  while(seq.length<n) seq.push(pick(fill));
+  if(allowNone && pool.length && seq.indexOf(null)<0 && n>pool.length) seq[seq.length-1]=null;
+  seq = shuffle(seq);
+  S.art.notes.forEach((nt,i)=>nt.art=seq[i]);
+}
+
+/* ================= DYNAMICS MODE ================= */
+function dynNewRhythm(){
+  const notes = [];
+  for(let m=0;m<2;m++){
+    let pos = 0;
+    while(pos<4){
+      const opts = [];
+      if(pos===0) opts.push(["w",1]);
+      if(pos%2===0) opts.push(["h",3]);
+      opts.push(["q",4]);
+      opts.push(["ee",2]);
+      const c = weighted(opts);
+      if(c==="ee"){ notes.push({dur:"8",start:m*4+pos,m}); notes.push({dur:"8",start:m*4+pos+0.5,m}); pos+=1; }
+      else { notes.push({dur:c,start:m*4+pos,m}); pos+=DUR_BEATS[c]; }
+    }
+  }
+  notes.forEach(n=>{n.dyn=null;n.hp=null;});
+  S.dyn.notes = notes; S.dyn.sel = -1;
+}
+function dynRandomize(){
+  const notes = S.dyn.notes;
+  notes.forEach(n=>{n.dyn=null;n.hp=null;});
+  // candidate onsets on whole beats, keep at least 2 beats apart
+  const target = 3 + rnd(2); // aim for 3-4 markings
+  const chosen = [0];
+  const onBeat = notes.map((n,i)=>i).filter(i=>i>0 && Number.isInteger(notes[i].start));
+  // always put at least one marking in measure 2
+  chosen.push(pick(onBeat.filter(i=>notes[i].start>=4 && notes[i].start<=6)));
+  const cands = shuffle(onBeat.filter(i=>!chosen.includes(i)));
+  for(const i of cands){
+    if(chosen.length>=target) break;
+    if(chosen.every(j=>Math.abs(notes[j].start-notes[i].start)>=2)) chosen.push(i);
+  }
+  chosen.sort((a,b)=>a-b);
+  // decide hairpins between consecutive markings; make sure at least one exists
+  const hp = chosen.slice(0,-1).map(()=>Math.random()<0.6);
+  if(hp.length && !hp.some(Boolean)) hp[rnd(hp.length)] = true;
+  let lvl = 1 + rnd(4); // start p..f
+  notes[chosen[0]].dyn = lvl;
+  for(let k=1;k<chosen.length;k++){
+    let next;
+    if(hp[k-1]){
+      let dir = Math.random()<0.5?1:-1;
+      if(lvl+dir<0||lvl+dir>5) dir=-dir;
+      const span = 1 + rnd(dir>0? 5-lvl : lvl);
+      next = Math.max(0,Math.min(5,lvl+dir*Math.min(span,3)));
+      notes[chosen[k-1]].hp = dir>0?"cresc":"dim";
+    } else {
+      do { next = rnd(6); } while(next===lvl || Math.abs(next-lvl)>3);
+    }
+    notes[chosen[k]].dyn = next; lvl = next;
+  }
+}
+// hairpin end index (next marked note after i) or -1 = end of example
+function hpEnd(notes,i){ for(let j=i+1;j<notes.length;j++) if(notes[j].dyn!==null) return j; return -1; }
+function dynWarnings(){
+  const notes=S.dyn.notes, out=[];
+  notes.forEach((n,i)=>{
+    if(!n.hp) return;
+    let from = null; for(let k=i;k>=0;k--) if(notes[k].dyn!==null){ from=notes[k].dyn; break; }
+    const j = hpEnd(notes,i);
+    if(j<0 || from===null) return;
+    const to = notes[j].dyn;
+    if(n.hp==="cresc" && to<=from) out.push(`Crescendo on note ${i+1} leads to ${DYNS[to]}, which isn't louder than ${DYNS[from]}.`);
+    if(n.hp==="dim" && to>=from) out.push(`Decrescendo on note ${i+1} leads to ${DYNS[to]}, which isn't softer than ${DYNS[from]}.`);
+  });
+  return out;
+}
+
+/* ================= RENDERING ================= */
+function dynWidth(text,size){ let w=0; for(const ch of text){ w += new VF.Glyph(DYN_GLYPH[ch], size).getMetrics().width; } return w; }
+function drawDyn(ctx,text,x,y,size){ let cx=x; for(const ch of text){ const g=new VF.Glyph(DYN_GLYPH[ch], size); g.render(ctx,cx,y); cx+=g.getMetrics().width; } return cx-x; }
+function svgText(svg,x,y,txt,opts={}){
+  const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+  t.setAttribute("x",x); t.setAttribute("y",y); t.setAttribute("text-anchor",opts.anchor||"middle");
+  t.setAttribute("font-family","system-ui,Segoe UI,Arial,sans-serif"); t.setAttribute("font-size",opts.size||13);
+  t.setAttribute("fill",opts.color||"#444"); if(opts.italic) t.setAttribute("font-style","italic");
+  t.textContent=txt; svg.appendChild(t); return t;
+}
+function makeNote(n){
+  const key = KEY[S.clef];
+  const sn = new VF.StaveNote({ clef:S.clef, keys:[key], duration:n.dur, stem_direction:-1 });
+  return sn;
+}
+function newRenderer(W,H){
+  const host=$("score"); host.innerHTML="";
+  const r = new VF.Renderer(host, VF.Renderer.Backends.SVG);
+  r.resize(W,H);
+  const ctx=r.getContext();
+  const svg=ctx.svg;
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  svg.removeAttribute("width"); svg.removeAttribute("height");
+  svg.style.width="100%"; svg.style.height="auto";
+  return {ctx,svg};
+}
+function drawMeasure(ctx,x,y,w,notesData,first,last){
+  const stave = new VF.Stave(x,y,w);
+  if(first){ stave.addClef(S.clef).addTimeSignature("4/4"); }
+  if(last) stave.setEndBarType(VF.Barline.type.END);
+  stave.setContext(ctx).draw();
+  const vfn = notesData.map(makeNote);
+  const beams = VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true});
+  VF.Formatter.FormatAndDraw(ctx,stave,vfn,{auto_beam:false});
+  beams.forEach(b=>b.setContext(ctx).draw());
+  return {stave,vfn};
+}
+function noteCenter(sn){ return (sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2; }
+
+function renderArt(){
+  const W=760,H=150;
+  const {ctx,svg}=newRenderer(W,H);
+  const data=S.art.notes;
+  // attach articulations before formatting
+  const stave = new VF.Stave(10,0,W-20);
+  stave.addClef(S.clef).addTimeSignature("4/4").setEndBarType(VF.Barline.type.END);
+  stave.setContext(ctx).draw();
+  const vfn = data.map(n=>{
+    const sn=makeNote(n);
+    if(n.art){ sn.addModifier(new VF.Articulation(ART_BY[n.art].code).setPosition(VF.Modifier.Position.ABOVE),0); }
+    return sn;
+  });
+  const beams = VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true});
+  VF.Formatter.FormatAndDraw(ctx,stave,vfn,{auto_beam:false});
+  beams.forEach(b=>b.setContext(ctx).draw());
+  const els=[...svg.querySelectorAll("g.vf-stavenote")];
+  const xs=vfn.map(noteCenter);
+  if(S.labels){
+    const ly = stave.getYForLine(4)+58;
+    data.forEach((n,i)=>{ if(n.art) svgText(svg,xs[i],ly,ART_BY[n.art].name,{size:12}); });
+  }
+  render={svg,els,xs,mode:"art"};
+  applySel();
+}
+
+function renderDyn(){
+  const W=1000,H=170;
+  const {ctx,svg}=newRenderer(W,H);
+  const data=S.dyn.notes;
+  const m1=data.filter(n=>n.m===0), m2=data.filter(n=>n.m===1);
+  const A=drawMeasure(ctx,10,-10,505,m1,true,false);
+  const B=drawMeasure(ctx,515,-10,475,m2,false,true);
+  const vfn=A.vfn.concat(B.vfn);
+  const els=[...svg.querySelectorAll("g.vf-stavenote")];
+  const xs=vfn.map(noteCenter);
+  const lefts=vfn.map(sn=>sn.getNoteHeadBeginX());
+  const dy = A.stave.getYForLine(4)+58; // dynamics baseline
+  const SZ=38;
+  // dynamics
+  const dynBox = {};
+  data.forEach((n,i)=>{
+    if(n.dyn===null) return;
+    const txt=DYNS[n.dyn]; const w=dynWidth(txt,SZ);
+    const x0 = lefts[i]-2;
+    ctx.openGroup("dyn",null);
+    drawDyn(ctx,txt,x0,dy,SZ);
+    ctx.closeGroup();
+    dynBox[i]={x0,x1:x0+w};
+    if(S.labels) svgText(svg,x0+w/2,dy+24,DYN_NAME[txt],{size:12,italic:true});
+  });
+  // hairpins
+  const endX = B.stave.getX()+B.stave.getWidth()-12;
+  data.forEach((n,i)=>{
+    if(!n.hp) return;
+    let xa = dynBox[i]? dynBox[i].x1+8 : lefts[i];
+    const j=hpEnd(data,i);
+    let xb = j>=0 ? dynBox[j].x0-8 : endX;
+    if(xb-xa<24) xb=xa+24;
+    const cy=dy-8, h=9;
+    ctx.save(); ctx.setLineWidth(1.6); ctx.setStrokeStyle("#111");
+    ctx.beginPath();
+    if(n.hp==="cresc"){ ctx.moveTo(xb,cy-h); ctx.lineTo(xa,cy); ctx.lineTo(xb,cy+h); }
+    else { ctx.moveTo(xa,cy-h); ctx.lineTo(xb,cy); ctx.lineTo(xa,cy+h); }
+    ctx.stroke(); ctx.restore();
+    if(S.labels) svgText(svg,(xa+xb)/2,dy+24,n.hp==="cresc"?"crescendo":"decrescendo",{size:12,italic:true});
+  });
+  render={svg,els,xs,mode:"dyn"};
+  applySel();
+  const w=dynWarnings(); $("dWarn").textContent = w.join(" ");
+}
+
+function applySel(){
+  if(!render) return;
+  const st = S.mode==="art"? S.art : S.dyn;
+  render.els.forEach((el,i)=>el.classList.toggle("sel",i===st.sel));
+}
+function draw(){ stopPlayback(); if(S.mode==="art") renderArt(); else renderDyn(); updatePalettes(); }
+
+/* ---------- tap to select ---------- */
+$("score").addEventListener("click",e=>{
+  if(!render) return;
+  const svg=render.svg; const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
+  const p=pt.matrixTransform(svg.getScreenCTM().inverse());
+  let best=-1,bd=1e9; render.xs.forEach((x,i)=>{ const d=Math.abs(x-p.x); if(d<bd){bd=d;best=i;} });
+  if(bd>60) best=-1;
+  const st = S.mode==="art"? S.art : S.dyn;
+  st.sel = (st.sel===best)? -1 : best;
+  applySel(); updatePalettes();
+});
+
+/* ---------- palettes & reference cards ---------- */
+// Renders a single music glyph to a tightly-cropped SVG string
+function glyphSVG(fn,minW=30,minH=30,scale=1){
+  const tmp=document.createElement("div"); tmp.style.cssText="position:absolute;left:-9999px;top:0";
+  document.body.appendChild(tmp);
+  const r=new VF.Renderer(tmp,VF.Renderer.Backends.SVG); r.resize(300,200);
+  const ctx=r.getContext(); fn(ctx);
+  const svg=ctx.svg; const bb=svg.getBBox(); const pad=3;
+  const w=Math.max(minW,bb.width+pad*2), h=Math.max(minH,bb.height+pad*2);
+  const cx=bb.x+bb.width/2, cy=bb.y+bb.height/2;
+  svg.setAttribute("viewBox",`${cx-w/2} ${cy-h/2} ${w} ${h}`);
+  svg.removeAttribute("style"); svg.setAttribute("width",Math.round(w*scale)); svg.setAttribute("height",Math.round(h*scale));
+  const out=svg.outerHTML; tmp.remove(); return out;
+}
+const artGlyph = id => glyphSVG(ctx=>{ new VF.Glyph(ART_BY[id].glyph,40).render(ctx,100,100); },30,30,1);
+const artNoteGlyph = id => glyphSVG(ctx=>{
+  const st=new VF.Stave(0,40,90,{left_bar:false,right_bar:false}); st.options.num_lines=0;
+  const n=new VF.StaveNote({keys:["b/4"],duration:"q",stem_direction:-1});
+  n.addModifier(new VF.Articulation(ART_BY[id].code).setPosition(VF.Modifier.Position.ABOVE),0);
+  st.setContext(ctx); VF.Formatter.FormatAndDraw(ctx,st,[n]);
+},10,10,0.8);
+const dynGlyph = txt => glyphSVG(ctx=>drawDyn(ctx,txt,100,100,40),20,40,0.7);
+const hairGlyph = type => glyphSVG(ctx=>{
+  ctx.setLineWidth(2); ctx.beginPath();
+  if(type==="cresc"){ ctx.moveTo(160,90); ctx.lineTo(100,100); ctx.lineTo(160,110); }
+  else { ctx.moveTo(100,90); ctx.lineTo(160,100); ctx.lineTo(100,110); }
+  ctx.stroke();
+},40,40,0.7);
+const NONE_SYM = '<span style="font-size:1.3rem;color:var(--muted)">∅</span>';
+
+function buildStatic(){
+  // articulation palette
+  const ap=$("aPal"); ap.innerHTML="";
+  ARTS.forEach((a,k)=>{
+    const b=document.createElement("button"); b.dataset.art=a.id||"";
+    b.innerHTML=`<span class="sym">${a.id?artGlyph(a.id):NONE_SYM}</span><span class="nm">${k}·${a.name}</span>`;
+    b.onclick=()=>setArt(a.id); ap.appendChild(b);
+  });
+  // pool
+  const pool=$("aPool"); pool.innerHTML="";
+  [["stacc","Staccato"],["ten","Tenuto"],["acc","Accent"],["marc","Marcato"],["none","Plain notes (no articulation)"]].forEach(([k,nm])=>{
+    const l=document.createElement("label");
+    l.innerHTML=`<input type="checkbox" ${S.pool[k]?"checked":""}> ${nm}`;
+    l.querySelector("input").onchange=e=>{ S.pool[k]=e.target.checked; store.set("pool",S.pool); };
+    pool.appendChild(l);
+  });
+  // art refs
+  const ar=$("aRefs"); ar.innerHTML="";
+  Object.entries(ART_REF).forEach(([id,[nm,txt]])=>{
+    ar.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${artNoteGlyph(id)}</div><div><b>${nm}</b><p>${txt}</p></div></div>`);
+  });
+  // dynamics palettes
+  const dp=$("dPal"); dp.innerHTML="";
+  [null,0,1,2,3,4,5].forEach(l=>{
+    const b=document.createElement("button"); b.dataset.dyn=l===null?"":l;
+    b.innerHTML=`<span class="sym">${l===null?NONE_SYM:dynGlyph(DYNS[l])}</span><span class="nm">${l===null?"None":DYN_NAME[DYNS[l]]}</span>`;
+    b.onclick=()=>setDyn(l); dp.appendChild(b);
+  });
+  const hp=$("hPal"); hp.innerHTML="";
+  [[null,"No hairpin"],["cresc","Crescendo"],["dim","Decrescendo"]].forEach(([t,nm])=>{
+    const b=document.createElement("button"); b.dataset.hp=t||"";
+    b.innerHTML=`<span class="sym">${t?hairGlyph(t):NONE_SYM}</span><span class="nm">${nm}</span>`;
+    b.onclick=()=>setHp(t); hp.appendChild(b);
+  });
+  // dyn refs
+  const dr=$("dRefs"); dr.innerHTML="";
+  DYNS.forEach(d=>dr.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${dynGlyph(d)}</div><div><b>${DYN_NAME[d]}</b><p>${DYN_MEAN[d]}</p></div></div>`));
+  dr.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${hairGlyph("cresc")}</div><div><b>Crescendo</b><p>Gradually get louder until the next dynamic marking.</p></div></div>`);
+  dr.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${hairGlyph("dim")}</div><div><b>Decrescendo</b><p>Gradually get softer (also called diminuendo). Keep your tone supported.</p></div></div>`);
+}
+function updatePalettes(){
+  if(S.mode==="art"){
+    const sel=S.art.sel, n=S.art.notes[sel];
+    $("aSelInfo").textContent = n? `Note ${sel+1} of ${S.art.notes.length} selected — choose its articulation (keys 0–4, ←/→ to move).` : "Tap a note in the measure to choose its articulation.";
+    [...$("aPal").children].forEach(b=>{ b.disabled=!n; b.classList.toggle("on", !!n && (b.dataset.art||null)===(n.art||null)); });
+  } else {
+    const sel=S.dyn.sel, n=S.dyn.notes[sel];
+    $("dSelInfo").textContent = n? `Note ${sel+1} of ${S.dyn.notes.length} selected.` : "Tap a note to give it a dynamic or start a hairpin there.";
+    [...$("dPal").children].forEach(b=>{ b.disabled=!n; b.classList.toggle("on", !!n && String(n.dyn===null?"":n.dyn)===b.dataset.dyn); });
+    [...$("hPal").children].forEach(b=>{ b.disabled=!n; b.classList.toggle("on", !!n && (n.hp||"")===b.dataset.hp); });
+  }
+}
+function setArt(id){ const n=S.art.notes[S.art.sel]; if(!n) return; n.art=id; draw(); }
+function setDyn(l){ const n=S.dyn.notes[S.dyn.sel]; if(!n) return; n.dyn=l; draw(); }
+function setHp(t){ const n=S.dyn.notes[S.dyn.sel]; if(!n) return; n.hp=t; draw(); }
+
+/* ================= AUDIO ================= */
+let AC=null, master=null, live=[], timers=[], playing=false;
+function audio(){
+  if(!AC){ AC=new (window.AudioContext||window.webkitAudioContext)(); master=AC.createGain(); master.gain.value=0.9; master.connect(AC.destination); }
+  if(AC.state==="suspended") AC.resume();
+  return AC;
+}
+const FREQ = 233.08; // concert Bb
+// gainAt(t0..t1) supplies start/end sustain level; boost = attack multiplier
+function voice(t,len,g0,g1,boost){
+  const osc1=AC.createOscillator(), osc2=AC.createOscillator(), filt=AC.createBiquadFilter(), env=AC.createGain();
+  osc1.type="sawtooth"; osc2.type="sawtooth"; osc1.frequency.value=FREQ; osc2.frequency.value=FREQ; osc2.detune.value=7;
+  filt.type="lowpass"; filt.Q.value=0.8;
+  const cut = g => 500 + g*5200;
+  const mix=AC.createGain(); mix.gain.value=0.5;
+  osc1.connect(mix); osc2.connect(mix); mix.connect(filt); filt.connect(env); env.connect(master);
+  const atk=0.018, rel=0.04, peak=Math.min(0.95,g0*boost);
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(peak,t+atk);
+  filt.frequency.setValueAtTime(cut(peak),t);
+  if(boost>1){ const d=Math.min(0.16,len*0.5); env.gain.linearRampToValueAtTime(g0,t+atk+d); filt.frequency.linearRampToValueAtTime(cut(g0),t+atk+d); }
+  const sEnd=Math.max(t+atk+0.01,t+len-rel);
+  env.gain.linearRampToValueAtTime(g1,sEnd); filt.frequency.linearRampToValueAtTime(cut(g1),sEnd);
+  env.gain.linearRampToValueAtTime(0.0001,t+len);
+  osc1.start(t); osc2.start(t); osc1.stop(t+len+0.05); osc2.stop(t+len+0.05);
+  live.push(osc1,osc2);
+}
+function click(t,strong){
+  const o=AC.createOscillator(), g=AC.createGain(); o.type="square"; o.frequency.value=strong?1600:1100;
+  g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(strong?0.35:0.22,t+0.002); g.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+  o.connect(g); g.connect(master); o.start(t); o.stop(t+0.06); live.push(o);
+}
+function highlight(i,on){ if(render && render.els[i]) render.els[i].classList.toggle("play",on); }
+function at(t,fn){ timers.push(setTimeout(fn, Math.max(0,(t-AC.currentTime)*1000))); }
+
+// Dynamics level (fractional index into DYN_GAIN) as a function of beat
+function levelFn(notes){
+  const marks=[]; notes.forEach((n,i)=>{ if(n.dyn!==null) marks.push(i); });
+  const firstLvl = marks.length? notes[marks[0]].dyn : 3;
+  const total = 8;
+  // build segments: [b0,b1,l0,l1]
+  const segs=[]; let curLvl=firstLvl, curBeat=0;
+  // walk notes, handling markings and hairpins
+  const events=[]; // {beat, lvl?, hp?}
+  notes.forEach((n,i)=>{
+    if(n.dyn!==null) events.push({beat:n.start,set:n.dyn});
+    if(n.hp){
+      const j=hpEnd(notes,i);
+      let fromLvl=null; for(let k=i;k>=0;k--) if(notes[k].dyn!==null){ fromLvl=notes[k].dyn; break; }
+      if(fromLvl===null) fromLvl=firstLvl;
+      const endBeat = j>=0? notes[j].start : total;
+      const toLvl = j>=0? notes[j].dyn : Math.max(0,Math.min(5,fromLvl+(n.hp==="cresc"?2:-2)));
+      events.push({beat:n.start,ramp:[endBeat,fromLvl,toLvl]});
+    }
+  });
+  return beat=>{
+    let lvl=firstLvl;
+    for(const e of events){ if(e.beat>beat) break; if(e.set!==undefined) lvl=e.set; }
+    for(const e of events){
+      if(e.ramp && beat>=e.beat && beat<=e.ramp[0]){
+        const [b1,l0,l1]=e.ramp; const f=(beat-e.beat)/Math.max(0.001,b1-e.beat); return l0+(l1-l0)*f;
+      }
+    }
+    return lvl;
+  };
+}
+function lvlGain(l){ const a=Math.floor(l), b=Math.min(5,a+1), f=l-a; return DYN_GAIN[a]+(DYN_GAIN[b]-DYN_GAIN[a])*f; }
+
+function play(){
+  if(playing){ stopPlayback(); return; }
+  audio(); playing=true; $("play").textContent="■ Stop";
+  const spb=60/S.tempo; let t=AC.currentTime+0.12;
+  if(S.countin){ for(let b=0;b<4;b++) click(t+b*spb,b===0); t+=4*spb; }
+  const t0=t;
+  if(S.mode==="art"){
+    const base=DYN_GAIN[3];
+    S.art.notes.forEach((n,i)=>{
+      const dur=DUR_BEATS[n.dur]*spb, st=t0+n.start*spb;
+      let len=dur*0.86, boost=1, g=base;
+      if(n.art==="stacc"){ len=Math.min(dur*0.42,0.22+0*dur); len=Math.max(len,0.07); }
+      if(n.art==="ten"){ len=dur*0.995; g=base*1.12; }
+      if(n.art==="acc"){ boost=2.2; }
+      if(n.art==="marc"){ boost=2.9; len=dur*0.62; g=base*1.1; }
+      voice(st,len,g,g,boost);
+      at(st,()=>highlight(i,true)); at(st+Math.max(len,dur*0.8),()=>highlight(i,false));
+    });
+    const end=t0+4*spb; at(end+0.05,stopPlayback);
+  } else {
+    const L=levelFn(S.dyn.notes);
+    S.dyn.notes.forEach((n,i)=>{
+      const beats=DUR_BEATS[n.dur], dur=beats*spb, st=t0+n.start*spb;
+      const len=dur*0.94;
+      voice(st,len,lvlGain(L(n.start)),lvlGain(L(n.start+beats*0.94)),1);
+      at(st,()=>highlight(i,true)); at(st+dur*0.95,()=>highlight(i,false));
+    });
+    at(t0+8*spb+0.05,stopPlayback);
+  }
+}
+function stopPlayback(){
+  timers.forEach(clearTimeout); timers=[];
+  if(AC){ const now=AC.currentTime; live.forEach(o=>{ try{o.stop(now);}catch(e){} }); }
+  live=[]; playing=false; $("play").textContent="▶ Play";
+  if(render) render.els.forEach(el=>el.classList.remove("play"));
+}
+
+/* ================= WIRING ================= */
+function setMode(m){
+  S.mode=m; store.set("mode",m);
+  $("tabArt").classList.toggle("on",m==="art"); $("tabDyn").classList.toggle("on",m==="dyn");
+  $("artUI").classList.toggle("hidden",m!=="art"); $("dynUI").classList.toggle("hidden",m!=="dyn");
+  draw();
+}
+$("tabArt").onclick=()=>setMode("art");
+$("tabDyn").onclick=()=>setMode("dyn");
+$("aNewAll").onclick=()=>{ artNewRhythm(); artRandomize(); draw(); };
+$("aNewRhythm").onclick=()=>{ const old=S.art.notes.map(n=>n.art); artNewRhythm(); S.art.notes.forEach((n,i)=>n.art=old[i]??null); draw(); };
+$("aShuffle").onclick=()=>{ artRandomize(); draw(); };
+$("aClear").onclick=()=>{ S.art.notes.forEach(n=>n.art=null); draw(); };
+$("dNewAll").onclick=()=>{ dynNewRhythm(); dynRandomize(); draw(); };
+$("dNewRhythm").onclick=()=>{ dynNewRhythm(); dynRandomize(); draw(); };
+$("dShuffle").onclick=()=>{ dynRandomize(); S.dyn.sel=-1; draw(); };
+$("dClear").onclick=()=>{ S.dyn.notes.forEach(n=>{n.dyn=null;n.hp=null;}); draw(); };
+$("play").onclick=play;
+$("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm";
+$("tempo").oninput=e=>{ S.tempo=+e.target.value; $("tempoVal").textContent=S.tempo+" bpm"; store.set("tempo",S.tempo); };
+$("countin").checked=S.countin; $("countin").onchange=e=>{ S.countin=e.target.checked; store.set("countin",S.countin); };
+$("labels").checked=S.labels; $("labels").onchange=e=>{ S.labels=e.target.checked; store.set("labels",S.labels); draw(); };
+$("clef").value=S.clef; $("clef").onchange=e=>{ S.clef=e.target.value; store.set("clef",S.clef); draw(); };
+function applyTheme(t){ document.documentElement.dataset.theme=t; store.set("theme",t); $("theme").textContent=t==="dark"?"☀️":"🌙"; }
+applyTheme(store.get("theme", matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
+$("theme").onclick=()=>applyTheme(document.documentElement.dataset.theme==="dark"?"light":"dark");
+
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT"&&e.target.type!=="checkbox"&&e.target.type!=="range") return;
+  if(e.key===" "){ e.preventDefault(); play(); return; }
+  if(e.key==="n"||e.key==="N"){ (S.mode==="art"?$("aNewAll"):$("dNewAll")).click(); return; }
+  if(e.key==="Escape"){ (S.mode==="art"?S.art:S.dyn).sel=-1; applySel(); updatePalettes(); return; }
+  const st=S.mode==="art"?S.art:S.dyn;
+  if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
+    e.preventDefault(); const n=st.notes.length; st.sel = st.sel<0?0:(st.sel+(e.key==="ArrowRight"?1:n-1))%n; applySel(); updatePalettes(); return;
+  }
+  if(S.mode==="art" && /^[0-4]$/.test(e.key) && st.sel>=0){ setArt(ARTS[+e.key].id); }
+});
+
+buildStatic();
+artNewRhythm(); artRandomize();
+dynNewRhythm(); dynRandomize();
+setMode(S.mode);
+</script>
+</body>
+</html>
