@@ -57,6 +57,10 @@ input[type=checkbox]{accent-color:var(--accent);width:18px;height:18px}
 .ref .sym svg{max-height:40px;max-width:52px}
 .ref b{display:block}
 .ref p{margin:2px 0 0;font-size:.88rem;color:var(--muted)}
+.ref svg.shape{display:block;width:160px;height:auto;margin:5px 0 3px}
+.ref .pct{display:block;font-size:.8rem;font-weight:700}
+.ref.anatomy{grid-column:1/-1;align-items:center}
+.ref.anatomy svg.shape{width:330px;max-width:45%;flex:0 0 auto;margin:0;color:var(--ink)}
 details.refwrap{margin-top:14px}
 details.refwrap summary{cursor:pointer;font-weight:600;color:var(--muted)}
 .hidden{display:none!important}
@@ -93,6 +97,8 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
     <label>Tempo <input id="tempo" type="range" min="50" max="160" step="2" value="80"> <span id="tempoVal">80</span></label>
     <label><input id="countin" type="checkbox" checked> Count-off</label>
     <label><input id="labels" type="checkbox"> Show names</label>
+    <label id="shapesWrap"><input id="shapes" type="checkbox"> Show note shapes</label>
+    <label>Pitch <select id="pitch"><option value="F">Concert F</option><option value="Bb">Concert B♭</option></select></label>
     <span class="grow"></span>
     <span class="hint">Space = play · N = new · Tap a note to edit it</span>
   </div>
@@ -145,7 +151,7 @@ footer{color:var(--muted);font-size:.8rem;text-align:center;margin-top:18px}
 <script src="lib/vexflow-4.2.5.js"></script>
 <script>
 "use strict";
-const VERSION = "1.0.0";
+const VERSION = "1.1.0";
 const VF = (window.Vex && Vex.Flow) || window.VexFlow;
 document.getElementById("ver").textContent = VERSION;
 
@@ -157,19 +163,41 @@ const store = {
 
 /* ---------- constants ---------- */
 const ARTS = [
-  { id:null,   name:"None",     code:null },
-  { id:"stacc",name:"Staccato", code:"a.", glyph:"articStaccatoAbove" },
-  { id:"ten",  name:"Tenuto",   code:"a-", glyph:"articTenutoAbove" },
-  { id:"acc",  name:"Accent",   code:"a>", glyph:"articAccentAbove" },
-  { id:"marc", name:"Marcato",  code:"a^", glyph:"articMarcatoAbove" },
+  { id:null,   name:"None",        codes:[] },
+  { id:"stacc",name:"Staccato",    codes:["a."], glyphs:["articStaccatoAbove"] },
+  { id:"ten",  name:"Tenuto",      codes:["a-"], glyphs:["articTenutoAbove"] },
+  { id:"acc",  name:"Accent",      codes:["a>"], glyphs:["articAccentAbove"] },
+  { id:"marc", name:"Marcato",     codes:["a^"], glyphs:["articMarcatoAbove"] },
+  { id:"lift", name:"Long Lifted", codes:["a.","a-"], glyphs:["articStaccatoAbove","articTenutoAbove"] },
 ];
 const ART_BY = Object.fromEntries(ARTS.filter(a=>a.id).map(a=>[a.id,a]));
-const ART_REF = {
-  stacc:["Staccato","Dot above or below the note. Short and separated — about half the written length. Light, not heavy."],
-  ten:["Tenuto","Line above or below the note. Hold it for its full value with full weight, connected to the next note."],
-  acc:["Accent","Wedge (>). Strong attack at the start, then back off to the dynamic. Keep the note its full length."],
-  marc:["Marcato","Rooftop (^). The strongest accent: a heavier attack, louder and a bit more separated than >."],
+/* Note Shapes and Note Lengths guide (Raven Band) */
+const SHAPE = {
+  none:  { sound:0.90, decay:false },
+  ten:   { sound:1.00, decay:false, pct:"100% Sound / 0% Space" },
+  lift:  { sound:0.75, decay:false, pct:"75% Sound / 25% Space" },
+  stacc: { sound:0.50, decay:false, pct:"50% Sound / 50% Space" },
+  acc:   { sound:1.00, decay:true,  pct:"100% Sound / 0% Space · Weight + Decay" },
+  marc:  { sound:0.50, decay:true,  pct:"50% Sound / 50% Space · Weight + Decay" },
 };
+const ART_REF = {
+  ten:["Tenuto","Line. Full, even sound for the whole note, connected right into the next note."],
+  lift:["Long Lifted","Dot + line. Full, even sound, then lift off for the last quarter of the note."],
+  stacc:["Staccato","Dot. Even sound for half the note, then space for the other half."],
+  acc:["Accent","Wedge (>). Weight at the start, then let the sound decay through the full length of the note."],
+  marc:["Marcato","Rooftop (^). Weight at the start, decay quickly, and release at the halfway point. Half sound, half space."],
+};
+const GREEN="#6cbf3a";
+function shapeMarkup(x,y,w,h,art){
+  const sh=SHAPE[art||"none"], sw=w*sh.sound;
+  let m=`<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#fff" stroke="#222" stroke-width="1.2"/>`;
+  m += sh.decay
+    ? `<polygon points="${x},${y} ${x+sw},${y+h/2} ${x},${y+h}" fill="${GREEN}"/>`
+    : `<rect x="${x}" y="${y}" width="${sw}" height="${h}" fill="${GREEN}"/>`;
+  m += `<rect x="${x}" y="${y}" width="${sw}" height="${h}" fill="none" stroke="#222" stroke-width="1.4" stroke-dasharray="3 2"/>`;
+  return m;
+}
+const PITCH = { F:349.23, Bb:233.08 };
 const DYNS = ["pp","p","mp","mf","f","ff"];
 const DYN_NAME = { pp:"pianissimo", p:"piano", mp:"mezzo piano", mf:"mezzo forte", f:"forte", ff:"fortissimo" };
 const DYN_MEAN = { pp:"Very soft", p:"Soft", mp:"Medium soft", mf:"Medium loud", f:"Loud", ff:"Very loud" };
@@ -192,7 +220,9 @@ const S = {
   tempo: store.get("tempo",80),
   countin: store.get("countin",true),
   labels: store.get("labels",false),
-  pool: store.get("pool",{stacc:true,ten:true,acc:true,marc:true,none:false}),
+  pool: store.get("pool",{stacc:true,ten:true,acc:true,marc:true,lift:false,none:false}),
+  shapes: store.get("shapes",true),
+  pitch: store.get("pitch","F"),
   art: { notes:[], sel:-1 },
   dyn: { notes:[], sel:-1 },
 };
@@ -212,7 +242,7 @@ function artNewRhythm(){
   S.art.notes = notes; S.art.sel = -1;
 }
 function artRandomize(){
-  const pool = ["stacc","ten","acc","marc"].filter(k=>S.pool[k]);
+  const pool = ["stacc","ten","acc","marc","lift"].filter(k=>S.pool[k]);
   const allowNone = S.pool.none || pool.length===0;
   const n = S.art.notes.length;
   // every enabled articulation appears at least once (when there are enough notes)
@@ -333,7 +363,7 @@ function drawMeasure(ctx,x,y,w,notesData,first,last){
 function noteCenter(sn){ return (sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2; }
 
 function renderArt(){
-  const W=760,H=150;
+  const W=760,H=S.shapes?(S.labels?176:152):150;
   const {ctx,svg}=newRenderer(W,H);
   const data=S.art.notes;
   // attach articulations before formatting
@@ -342,16 +372,32 @@ function renderArt(){
   stave.setContext(ctx).draw();
   const vfn = data.map(n=>{
     const sn=makeNote(n);
-    if(n.art){ sn.addModifier(new VF.Articulation(ART_BY[n.art].code).setPosition(VF.Modifier.Position.ABOVE),0); }
+    if(n.art){ ART_BY[n.art].codes.forEach(c=>sn.addModifier(new VF.Articulation(c).setPosition(VF.Modifier.Position.ABOVE),0)); }
     return sn;
   });
   const beams = VF.Beam.generateBeams(vfn,{groups:[new VF.Fraction(1,4)], maintain_stem_directions:true});
-  VF.Formatter.FormatAndDraw(ctx,stave,vfn,{auto_beam:false});
+  // near-proportional spacing so the note-shape bars line up with the rhythm
+  const voiceA=new VF.Voice({num_beats:4,beat_value:4}).addTickables(vfn);
+  new VF.Formatter({softmaxFactor:150}).joinVoices([voiceA]).formatToStave([voiceA],stave);
+  voiceA.draw(ctx,stave);
   beams.forEach(b=>b.setContext(ctx).draw());
   const els=[...svg.querySelectorAll("g.vf-stavenote")];
   const xs=vfn.map(noteCenter);
+  const lefts=vfn.map(sn=>sn.getNoteHeadBeginX());
+  const last=data.length-1, unit=(lefts[last]-lefts[0])/Math.max(0.5,data[last].start);
+  let ly = stave.getYForLine(4)+58;
+  if(S.shapes){
+    const y0=stave.getYForLine(4)+44, h=20, endX=stave.getX()+stave.getWidth()-12;
+    let m="";
+    data.forEach((n,i)=>{
+      const x=lefts[i]-3, x2=(i<last? lefts[i+1]-9 : Math.min(endX, lefts[i]+DUR_BEATS[n.dur]*unit-9));
+      m+=shapeMarkup(x,y0,Math.max(14,x2-x),h,n.art);
+    });
+    const g=document.createElementNS("http://www.w3.org/2000/svg","g"); g.setAttribute("class","shapes");
+    g.innerHTML=m; svg.appendChild(g);
+    ly = y0+h+16;
+  }
   if(S.labels){
-    const ly = stave.getYForLine(4)+58;
     data.forEach((n,i)=>{ if(n.art) svgText(svg,xs[i],ly,ART_BY[n.art].name,{size:12}); });
   }
   render={svg,els,xs,mode:"art"};
@@ -417,7 +463,7 @@ $("score").addEventListener("click",e=>{
   const svg=render.svg; const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
   const p=pt.matrixTransform(svg.getScreenCTM().inverse());
   let best=-1,bd=1e9; render.xs.forEach((x,i)=>{ const d=Math.abs(x-p.x); if(d<bd){bd=d;best=i;} });
-  if(bd>60) best=-1;
+  if(bd>90) best=-1;
   const st = S.mode==="art"? S.art : S.dyn;
   st.sel = (st.sel===best)? -1 : best;
   applySel(); updatePalettes();
@@ -437,11 +483,11 @@ function glyphSVG(fn,minW=30,minH=30,scale=1){
   svg.removeAttribute("style"); svg.setAttribute("width",Math.round(w*scale)); svg.setAttribute("height",Math.round(h*scale));
   const out=svg.outerHTML; tmp.remove(); return out;
 }
-const artGlyph = id => glyphSVG(ctx=>{ new VF.Glyph(ART_BY[id].glyph,40).render(ctx,100,100); },30,30,1);
+const artGlyph = id => glyphSVG(ctx=>{ ART_BY[id].glyphs.forEach((g,k)=>new VF.Glyph(g,40).render(ctx,100,100-k*9)); },30,30,1);
 const artNoteGlyph = id => glyphSVG(ctx=>{
   const st=new VF.Stave(0,40,90,{left_bar:false,right_bar:false}); st.options.num_lines=0;
   const n=new VF.StaveNote({keys:["b/4"],duration:"q",stem_direction:-1});
-  n.addModifier(new VF.Articulation(ART_BY[id].code).setPosition(VF.Modifier.Position.ABOVE),0);
+  ART_BY[id].codes.forEach(c=>n.addModifier(new VF.Articulation(c).setPosition(VF.Modifier.Position.ABOVE),0));
   st.setContext(ctx); VF.Formatter.FormatAndDraw(ctx,st,[n]);
 },10,10,0.8);
 const dynGlyph = txt => glyphSVG(ctx=>drawDyn(ctx,txt,100,100,40),20,40,0.7);
@@ -463,7 +509,7 @@ function buildStatic(){
   });
   // pool
   const pool=$("aPool"); pool.innerHTML="";
-  [["stacc","Staccato"],["ten","Tenuto"],["acc","Accent"],["marc","Marcato"],["none","Plain notes (no articulation)"]].forEach(([k,nm])=>{
+  [["stacc","Staccato"],["ten","Tenuto"],["acc","Accent"],["marc","Marcato"],["lift","Long Lifted"],["none","Plain notes (no articulation)"]].forEach(([k,nm])=>{
     const l=document.createElement("label");
     l.innerHTML=`<input type="checkbox" ${S.pool[k]?"checked":""}> ${nm}`;
     l.querySelector("input").onchange=e=>{ S.pool[k]=e.target.checked; store.set("pool",S.pool); };
@@ -471,8 +517,9 @@ function buildStatic(){
   });
   // art refs
   const ar=$("aRefs"); ar.innerHTML="";
+  ar.insertAdjacentHTML("beforeend",`<div class="ref anatomy"><svg viewBox="0 0 330 92" class="shape"><rect x="80" y="26" width="170" height="44" fill="#fff" stroke="#222" stroke-width="1.4"/><line x1="80" y1="14" x2="80" y2="82" stroke="#9b4dca" stroke-width="2" stroke-dasharray="4 3"/><line x1="250" y1="14" x2="250" y2="82" stroke="#9b4dca" stroke-width="2" stroke-dasharray="4 3"/><text x="74" y="22" text-anchor="end" font-size="12" fill="currentColor">Beginning /</text><text x="74" y="36" text-anchor="end" font-size="12" fill="currentColor">Initiation</text><text x="256" y="22" font-size="12" fill="currentColor">End /</text><text x="256" y="36" font-size="12" fill="currentColor">Release</text><text x="165" y="53" text-anchor="middle" font-size="13" fill="#222">Middle / Sustain</text></svg><div><b>Note Shapes and Note Lengths</b><p>Every note has a beginning, a middle, and an end. Each articulation changes how much of the note is <b style="display:inline;color:${GREEN}">sound</b> and how much is space, and whether the sound stays even or has weight that decays.</p></div></div>`);
   Object.entries(ART_REF).forEach(([id,[nm,txt]])=>{
-    ar.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${artNoteGlyph(id)}</div><div><b>${nm}</b><p>${txt}</p></div></div>`);
+    ar.insertAdjacentHTML("beforeend",`<div class="ref"><div class="sym">${artNoteGlyph(id)}</div><div><b>${nm}</b><svg class="shape" viewBox="0 0 162 26">${shapeMarkup(1,1,160,24,id)}</svg><span class="pct">${SHAPE[id].pct}</span><p>${txt}</p></div></div>`);
   });
   // dynamics palettes
   const dp=$("dPal"); dp.innerHTML="";
@@ -496,7 +543,7 @@ function buildStatic(){
 function updatePalettes(){
   if(S.mode==="art"){
     const sel=S.art.sel, n=S.art.notes[sel];
-    $("aSelInfo").textContent = n? `Note ${sel+1} of ${S.art.notes.length} selected — choose its articulation (keys 0–4, ←/→ to move).` : "Tap a note in the measure to choose its articulation.";
+    $("aSelInfo").textContent = n? `Note ${sel+1} of ${S.art.notes.length} selected — choose its articulation (keys 0–5, ←/→ to move).` : "Tap a note in the measure to choose its articulation.";
     [...$("aPal").children].forEach(b=>{ b.disabled=!n; b.classList.toggle("on", !!n && (b.dataset.art||null)===(n.art||null)); });
   } else {
     const sel=S.dyn.sel, n=S.dyn.notes[sel];
@@ -516,9 +563,9 @@ function audio(){
   if(AC.state==="suspended") AC.resume();
   return AC;
 }
-const FREQ = 233.08; // concert Bb
-// gainAt(t0..t1) supplies start/end sustain level; boost = attack multiplier
-function voice(t,len,g0,g1,boost){
+// g0/g1 = sustain level at start/end; boost = attack weight; decay = "weight + decay" shape
+function voice(t,len,g0,g1,boost,decay){
+  const FREQ = PITCH[S.pitch]||PITCH.F;
   const osc1=AC.createOscillator(), osc2=AC.createOscillator(), filt=AC.createBiquadFilter(), env=AC.createGain();
   osc1.type="sawtooth"; osc2.type="sawtooth"; osc1.frequency.value=FREQ; osc2.frequency.value=FREQ; osc2.detune.value=7;
   filt.type="lowpass"; filt.Q.value=0.8;
@@ -529,9 +576,14 @@ function voice(t,len,g0,g1,boost){
   env.gain.setValueAtTime(0.0001,t);
   env.gain.linearRampToValueAtTime(peak,t+atk);
   filt.frequency.setValueAtTime(cut(peak),t);
-  if(boost>1){ const d=Math.min(0.16,len*0.5); env.gain.linearRampToValueAtTime(g0,t+atk+d); filt.frequency.linearRampToValueAtTime(cut(g0),t+atk+d); }
   const sEnd=Math.max(t+atk+0.01,t+len-rel);
-  env.gain.linearRampToValueAtTime(g1,sEnd); filt.frequency.linearRampToValueAtTime(cut(g1),sEnd);
+  if(decay){
+    // weight + decay: the sound falls away steadily across the whole sound portion
+    env.gain.linearRampToValueAtTime(g0*0.2,sEnd); filt.frequency.linearRampToValueAtTime(cut(g0*0.2),sEnd);
+  } else {
+    if(boost>1){ const d=Math.min(0.16,len*0.5); env.gain.linearRampToValueAtTime(g0,t+atk+d); filt.frequency.linearRampToValueAtTime(cut(g0),t+atk+d); }
+    env.gain.linearRampToValueAtTime(g1,sEnd); filt.frequency.linearRampToValueAtTime(cut(g1),sEnd);
+  }
   env.gain.linearRampToValueAtTime(0.0001,t+len);
   osc1.start(t); osc2.start(t); osc1.stop(t+len+0.05); osc2.stop(t+len+0.05);
   live.push(osc1,osc2);
@@ -587,12 +639,10 @@ function play(){
     const base=DYN_GAIN[3];
     S.art.notes.forEach((n,i)=>{
       const dur=DUR_BEATS[n.dur]*spb, st=t0+n.start*spb;
-      let len=dur*0.86, boost=1, g=base;
-      if(n.art==="stacc"){ len=Math.min(dur*0.42,0.22+0*dur); len=Math.max(len,0.07); }
-      if(n.art==="ten"){ len=dur*0.995; g=base*1.12; }
-      if(n.art==="acc"){ boost=2.2; }
-      if(n.art==="marc"){ boost=2.9; len=dur*0.62; g=base*1.1; }
-      voice(st,len,g,g,boost);
+      const sh=SHAPE[n.art||"none"];
+      const len=Math.max(0.07, dur*Math.min(sh.sound,0.995));
+      const boost = n.art==="acc"?2.2 : n.art==="marc"?2.8 : 1;
+      voice(st,len,base,base,boost,sh.decay);
       at(st,()=>highlight(i,true)); at(st+Math.max(len,dur*0.8),()=>highlight(i,false));
     });
     const end=t0+4*spb; at(end+0.05,stopPlayback);
@@ -618,7 +668,7 @@ function stopPlayback(){
 function setMode(m){
   S.mode=m; store.set("mode",m);
   $("tabArt").classList.toggle("on",m==="art"); $("tabDyn").classList.toggle("on",m==="dyn");
-  $("artUI").classList.toggle("hidden",m!=="art"); $("dynUI").classList.toggle("hidden",m!=="dyn");
+  $("artUI").classList.toggle("hidden",m!=="art"); $("shapesWrap").classList.toggle("hidden",m!=="art"); $("dynUI").classList.toggle("hidden",m!=="dyn");
   draw();
 }
 $("tabArt").onclick=()=>setMode("art");
@@ -636,6 +686,8 @@ $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm";
 $("tempo").oninput=e=>{ S.tempo=+e.target.value; $("tempoVal").textContent=S.tempo+" bpm"; store.set("tempo",S.tempo); };
 $("countin").checked=S.countin; $("countin").onchange=e=>{ S.countin=e.target.checked; store.set("countin",S.countin); };
 $("labels").checked=S.labels; $("labels").onchange=e=>{ S.labels=e.target.checked; store.set("labels",S.labels); draw(); };
+$("shapes").checked=S.shapes; $("shapes").onchange=e=>{ S.shapes=e.target.checked; store.set("shapes",S.shapes); draw(); };
+$("pitch").value=S.pitch; $("pitch").onchange=e=>{ S.pitch=e.target.value; store.set("pitch",S.pitch); };
 $("clef").value=S.clef; $("clef").onchange=e=>{ S.clef=e.target.value; store.set("clef",S.clef); draw(); };
 function applyTheme(t){ document.documentElement.dataset.theme=t; store.set("theme",t); $("theme").textContent=t==="dark"?"☀️":"🌙"; }
 applyTheme(store.get("theme", matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
@@ -650,7 +702,7 @@ document.addEventListener("keydown",e=>{
   if(e.key==="ArrowRight"||e.key==="ArrowLeft"){
     e.preventDefault(); const n=st.notes.length; st.sel = st.sel<0?0:(st.sel+(e.key==="ArrowRight"?1:n-1))%n; applySel(); updatePalettes(); return;
   }
-  if(S.mode==="art" && /^[0-4]$/.test(e.key) && st.sel>=0){ setArt(ARTS[+e.key].id); }
+  if(S.mode==="art" && /^[0-5]$/.test(e.key) && st.sel>=0){ setArt(ARTS[+e.key].id); }
 });
 
 buildStatic();

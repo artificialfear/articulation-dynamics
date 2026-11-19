@@ -31,8 +31,12 @@ with sync_playwright() as p:
             arts = pg.evaluate("S.art.notes.map(n=>n.art)")
             assert all(a in arts for a in ["stacc", "ten", "acc", "marc"]), arts
             box = pg.locator("#score svg").bounding_box()
-            pg.mouse.click(box["x"] + box["width"] * 0.45, box["y"] + box["height"] * 0.5)
-            assert pg.evaluate("S.art.sel") >= 0
+            nx = pg.evaluate("render.xs[2]/760")
+            pg.mouse.click(box["x"] + box["width"] * nx, box["y"] + box["height"] * 0.4)
+            assert pg.evaluate("S.art.sel") == 2
+            for k in "12345":  # every articulation renders
+                pg.keyboard.press(k)
+                assert pg.evaluate("S.art.notes[2].art") == ["stacc","ten","acc","marc","lift"][int(k)-1]
             pg.keyboard.press("0")
             pg.check("#labels")
             pg.screenshot(path=f"{out}/art-{theme}.png", full_page=True)
