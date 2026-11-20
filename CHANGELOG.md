@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.4 — 2026-11-20
+- The agenda board's Articulation / Dynamics overlay and Warm-up now play **Synth (octaves)** instead of the trumpet sound.
+
 ## 2.4.3 — 2026-11-20
 - New sound option in ⚙ Settings → Sound: **Synth (octaves)**. Each note plays with the octave below it. Articulations, dynamics, hairpins, and fp all shape it the same way.
 

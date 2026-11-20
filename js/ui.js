@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.4.3";
+const VERSION = "2.4.4";
 const $ = id => document.getElementById(id);
 /* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
    Opens in presentation mode with the class's level; nothing is saved on the board. */
@@ -430,7 +430,7 @@ $("inst").value=S.inst; $("pattern").value=S.pattern;
 if(BOARD){
   const lv=LEVELS[QS.get("lvl")]||LEVELS["7th"];
   Object.assign(S,{ inst:"neutral", pattern:"single_F", tempo:lv.tempo, dynRange:lv.range, labels:false, shapes:true,
-    countin:true, metro:true, cursor:true, sound:"inst", mode: QS.get("mode")==="dyn"? "dyn" : "art",
+    countin:true, metro:true, cursor:true, sound:"octaves", mode: QS.get("mode")==="dyn"? "dyn" : "art",   // Mat 11/20: synth in octaves on the board
     pool:Object.assign({stacc:false,ten:false,acc:false,marc:false,lift:false,none:false},lv.pool), artOpt:lv.art, dynOpt:lv.dyn });
   const seed=QS.get("seed")||new Date().toDateString();
   S.art.notes=withSeed(seed+"|art",()=>newExample("art"));      // same example all day for this class

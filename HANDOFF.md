@@ -8,7 +8,7 @@ Repo: artificialfear/articulation-dynamics. Live at https://artificialfear.githu
 - `js/theory.js`: instruments (transposition `tr`, warm-up register `bb`, scale tonics `f`/`eb`, Remington/single-F tonic `rf`), pitch patterns, note spelling (`spell`, `noteKey`, `writtenKey`).
 - `js/model.js`: data model, random generation, articulation and dynamics randomizers, `levelFn` (loudness over time), `playPlan` (sound events shared by audio and mic), rhythm builder, share-link encode/decode.
 - `js/render.js`: VexFlow drawing of one example (`renderScore`) plus the icon helpers.
-- `js/audio.js`: Web Audio playback, with samples, synth, snare, metronome, cursor, and highlight. Sound options: `inst` (samples), `synth`, and `octaves` (2.4.3: `octaveVoice` plays two `synthVoice`s, midi and midi−12, each at 0.62 gain). Board mode always uses `inst`.
+- `js/audio.js`: Web Audio playback, with samples, synth, snare, metronome, cursor, and highlight. Sound options: `inst` (samples), `synth`, and `octaves` (2.4.3: `octaveVoice` plays two `synthVoice`s, midi and midi−12, each at 0.62 gain). Board mode always uses `octaves` (Mat 11/20, 2.4.4).
 - `js/ui.js`: state, panels, settings drawer, share popover, presentation and full screen, keyboard.
 - `js/quiz.js`, `js/mic.js`: Listening Quiz and mic check (see below).
 - `lib/vexflow-4.2.5.js`: bundled locally (no CDN).
@@ -54,7 +54,7 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
 - `?board=1&mode=art|dyn&lvl=…&seed=…`. The agenda board (artificialfear/agenda-board, same origin artificialfear.github.io) opens it in an iframe.
 - `LEVELS` in ui.js holds each class level's pool, rhythm options, dynamic range, and tempo.
 - `withSeed()` makes the example repeatable. The board sends `seed=<date>|<level>`, so 3rd and 4th Block (both 7th) share an example.
-- The hidden instrument `neutral` puts every note on b/4 and plays concert F (trumpet samples).
+- The hidden instrument `neutral` puts every note on b/4 and plays concert F. Since 2.4.4 the board plays it with the octave synth, so no samples load.
 - `store` is read and write disabled on the board.
 - "Back to agenda" and Esc post `{artDyn:"close"}` to the parent.
 - Must run on the ViewBoard's Chrome ~87: no :is/:where/:has, aspect-ratio, `.at()`, `??=`, or emoji newer than Unicode 9. (🎚 rendered as a box in testing, so Dynamics uses 🔊.)

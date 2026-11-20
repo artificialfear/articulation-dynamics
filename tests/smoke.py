@@ -200,6 +200,7 @@ with sync_playwright() as p:
     a3 = board("mode=art&lvl=7th&seed=2026-11-21|7th")
     assert a1 == a2 and a1 != a3, "same class + day = same example"
     assert ev(bp, "document.documentElement.classList.contains('present') && document.documentElement.classList.contains('board')")
+    assert ev(bp, "S.sound") == "octaves", "the board plays Synth (octaves)"
     assert ev(bp, "S.art.notes.every(n=>n.rest || noteKey(inst(),S.pattern,n.p)==='b/4')"), "whole band reads the middle line"
     assert "Articulation of the Day" in bp.inner_text("#boardTitle") and "7th Grade" in bp.inner_text("#boardTitle")
     assert not bp.is_visible("header") and bp.is_visible("#presentBar")
