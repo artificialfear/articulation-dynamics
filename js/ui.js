@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.4.0";
+const VERSION = "2.4.1";
 const $ = id => document.getElementById(id);
 /* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
    Opens in presentation mode with the class's level; nothing is saved on the board. */
@@ -43,7 +43,7 @@ const S = {
   dynOpt: Object.assign({rests:false,slurs:true,ties:true}, store.get("dynOpt",{})),
   art:{notes:[],sel:-1}, dyn:{notes:[],sel:-1},
   present:false, reveal:false, presentFs:false, dynRange:[0,5],
-  dynView: store.get("dynView","random"), hold: store.get("fermHold",2),
+  dynView: store.get("dynView","random"), warmSel: store.get("warmSel","1"),
 };
 const WARM = warmupNotes();
 const isWarm = () => S.mode==="dyn" && S.dynView==="warmup";
@@ -84,29 +84,35 @@ function draw(){
   if(S.mode==="dyn") $("dWarn").textContent=dynWarnings(s.notes).join(" ");
   if(typeof Mic!=="undefined" && Mic.onDraw) Mic.onDraw(R);
 }
-/* the warm-up: one staff per line, sharing one loudness curve and one cursor */
+/* the warm-up: #1 (ladder) and/or #2 (shapes), one staff per line, sharing one loudness curve and one cursor */
+const warmRange = () => S.warmSel==="both"? {from:0,to:filled(WARM)} : WARMUP_EX[S.warmSel];
 function renderWarmup(){
   const host=$("score"); host.innerHTML="";
   const LW=levelFn(WARM), lines=[], els=new Array(WARM.length).fill(null);
-  WARMUP_LINES.forEach(([m0,m1],k)=>{
+  const shown=WARMUP_LINES.filter(l=>S.warmSel==="both" || String(l.ex)===S.warmSel);
+  let lastEx=null;
+  shown.forEach((ln,k)=>{
+    const [m0,m1]=ln.m;
+    if(ln.ex!==lastEx){ const lb=document.createElement("div"); lb.className="wlabel"; lb.innerHTML=`#${ln.ex}<span>${WARMUP_EX[ln.ex].name}</span>`; host.appendChild(lb); lastEx=ln.ex; }
     const d=document.createElement("div"); d.className="wline"; host.appendChild(d);
     const idx=WARM.map((n,i)=>i).filter(i=>WARM[i].start>=m0*4 && WARM[i].start<m1*4);
     const sub=idx.map(i=>Object.assign(clone(WARM[i]),{start:WARM[i].start-m0*4}));
     const r=renderScore(d,{mode:"dyn",notes:sub,inst:inst(),pattern:warmPattern(),showArts:false,showDyns:true,
       labels: S.present? S.reveal : S.labels, shapes: S.present? S.reveal : S.shapes,
-      measures:m1-m0, noTime:k>0, noEnd:k<WARMUP_LINES.length-1, L:b=>LW(b+m0*4), width:1000,
-      tieIn: idx[0]>0 && WARM[idx[0]-1].tie});
+      measures:m1-m0, noTime:k>0, noEnd:k<shown.length-1, L:b=>LW(b+m0*4), width:1000,
+      tieIn: idx[0]>0 && WARM[idx[0]-1].tie && k>0});
     idx.forEach((gi,j)=>els[gi]=r.els[j]);
     lines.push({render:r,b0:m0*4,b1:m1*4});
   });
   return {lines,els,xs:[],svg:lines[0].render.svg,anchors:[]};
 }
-function playWarm(sec){
-  const s = sec==null? {from:0,to:filled(WARM)} : WARMUP_SECTIONS[sec];
+function playWarm(){
+  const s=warmRange();
   playExample({notes:WARM, mode:"dyn", inst:inst(), pattern:warmPattern(), tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor,
-    sound:S.sound, tm:timeMap(WARM,S.hold), total:filled(WARM), from:s.from, to:s.to, onStatus:setStatus});
+    sound:S.sound, total:filled(WARM), from:s.from, to:s.to, onStatus:setStatus});
   setPlayLabels(true);
 }
+function setWarmSel(v){ S.warmSel=v; store.set("warmSel",v); draw(); }
 function applySel(){ if(!R) return; const sel=st().sel; R.els.forEach((el,i)=>el&&el.classList.toggle("sel",i===sel)); }
 function nearestNote(render,e){
   const svg=render.svg, pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
@@ -227,6 +233,8 @@ function updateChrome(){
   $("pWarm").textContent = warm? "🎲 Random" : "🎯 Warm-up";
   $("warmUI").classList.toggle("hidden",!warm); $("dynRandom").classList.toggle("hidden",warm);
   $("dynView").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.dynView));
+  $("pWarmSel").classList.toggle("hidden",!warm);
+  ["warmSel","pWarmSel"].forEach(id=>$(id).querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.warmSel)));
   if(m==="dyn") $("share").classList.toggle("hidden",warm);
   $("pMode").textContent = m==="art"? "🔊 Dynamics" : "🎵 Articulation";
   if(BOARD){
@@ -263,7 +271,7 @@ function buildRefs(){
 function play(){
   if(playing){ stopPlayback(); return; }
   if(S.mode==="quiz"){ Quiz.play(); }
-  else if(isWarm()){ playWarm(null); return; }
+  else if(isWarm()){ playWarm(); return; }
   else playExample({notes:st().notes, mode:S.mode, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor, sound:S.sound, onStatus:setStatus});
   setPlayLabels(true);
 }
@@ -340,8 +348,8 @@ $("pPlay").onclick=play;
 $("pNew").onclick=()=>newHere();
 $("pWarm").onclick=()=>{ S.dynView = S.dynView==="warmup"? "random" : "warmup"; store.set("dynView",S.dynView); S.reveal=false; draw(); };
 $("dynView").querySelectorAll("button").forEach(b=>b.onclick=()=>{ S.dynView=b.dataset.v; store.set("dynView",S.dynView); draw(); });
-document.querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{ stopPlayback(); playWarm(b.dataset.wp==="all"? null : +b.dataset.wp); });
-$("fermHold").value=String(S.hold); $("fermHold").onchange=e=>{ S.hold=+e.target.value; store.set("fermHold",S.hold); };
+["warmSel","pWarmSel"].forEach(id=>$(id).querySelectorAll("button").forEach(b=>b.onclick=()=>setWarmSel(b.dataset.v)));
+$("warmPlay").onclick=()=>{ if(playing) stopPlayback(); else playWarm(); };
 $("pMode").onclick=()=>{ S.mode = S.mode==="art"? "dyn" : "art"; S.reveal=false; draw(); };
 function nudgeTempo(d){ S.tempo=Math.max(50,Math.min(160,S.tempo+d)); store.set("tempo",S.tempo); $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm"; updateChrome(); }
 $("pSlower").onclick=()=>nudgeTempo(-4); $("pFaster").onclick=()=>nudgeTempo(4);

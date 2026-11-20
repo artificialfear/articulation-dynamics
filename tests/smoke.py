@@ -256,30 +256,36 @@ with sync_playwright() as p:
     assert acc["worst"] < 0.10 and mean < 0.03, (acc["worst"], mean)
     assert acc["flagged"] > 20, acc
 
-    # ---- Dynamics Warm-up (Mat's example): 4 lines, fermatas, fp, sections, holds, cursor across lines
+    # ---- Dynamics Warm-up: #1 ladder (half note + half rest, in time), #2 shapes; pick #1 / #2 / Both
     pg.select_option("#inst", "clarinet"); pg.click("#tabDyn"); pg.click("#dynView [data-v=warmup]")
-    assert pg.locator("#score .wline").count() == 4 and pg.is_visible("#warmUI") and not pg.is_visible("#dynRandom")
-    assert ev(pg, "WARM.filter(n=>n.ferm).length") == 17 and ev(pg, "filled(WARM)") == 52
+    assert pg.is_visible("#warmUI") and not pg.is_visible("#dynRandom")
+    assert ev(pg, "WARM.filter(n=>n.ferm).length") == 0 and ev(pg, "filled(WARM)") == 72
+    assert ev(pg, "WARM.filter(n=>n.start<40).every((n,i,a)=> n.dur==='h' && (i%2? n.rest : !n.rest))"), "ladder = half note, half rest"
     assert ev(pg, "WARM.some(n=>n.dyn===FP)") and not ev(pg, "dynWarnings(WARM).length")
     assert ev(pg, "noteKey(inst(),warmPattern(),0)") == "g/4", "clarinet warm-up on concert F = written G"
-    assert pg.locator("#score .wline:nth-child(1) .vf-timesignature").count() == 1 and pg.locator("#score .wline:nth-child(2) .vf-timesignature").count() == 0
+    pg.click("#warmSel [data-v='1']")
+    assert pg.locator("#score .wline").count() == 2 and pg.inner_text("#score .wlabel").startswith("#1")
+    pg.click("#warmSel [data-v='2']")
+    assert pg.locator("#score .wline").count() == 2 and pg.inner_text("#score .wlabel").startswith("#2")
+    assert pg.locator("#score .wline:nth-of-type(2) .vf-timesignature").count() == 1, "#2 alone starts with 4/4"
+    pg.click("#warmSel [data-v=both]")
+    assert pg.locator("#score .wline").count() == 4 and pg.locator("#score .wlabel").count() == 2
     pg.check("#labels"); pg.check("#shapes"); pg.screenshot(path=f"{out}/warmup.png", full_page=True)
-    # a +2 hold moves the shapes section 2 beats later per fermata before it (11 fermatas in the ladder)
-    assert ev(pg, "timeMap(WARM,2).toTime(24)") == 24 + 2*11 and ev(pg, "timeMap(WARM,0).toTime(24)") == 24
-    assert ev(pg, "timeMap(WARM,2).inHold(1)") and not ev(pg, "timeMap(WARM,2).inHold(2)")
-    pg.select_option("#fermHold", "0")
-    ev(pg, "S.tempo=160")
-    pg.click("[data-wp='1']"); pg.wait_for_timeout(2600)                     # shapes: count-off (1.5 s) then line 3
-    cur3 = ev(pg, "!!document.querySelector('#score .wline:nth-child(3) line.cursor')")
-    pg.wait_for_timeout(5400)                                                # into line 4 (16 beats of line 3 = 6 s)
-    cur4 = ev(pg, "!!document.querySelector('#score .wline:nth-child(4) line.cursor')")
-    assert cur3 and cur4, (cur3, cur4)
-    pg.click("#play")                                                        # stop
-    # fp is loud on the attack and soft after: render the gain the synth would use
-    fp = ev(pg, """()=>{ const ev=playPlan(WARM,'dyn').find(e=>WARM[e.idxs[0]].dyn===FP); const L=levelFn(WARM);
-                     return [lvlGain(L(ev.start)), DYN_GAIN[4]]; }""")
-    assert fp[0] == 0.10 and fp[1] == 0.40
-    pg.keyboard.press("p"); pg.screenshot(path=f"{out}/warmup-present.png"); pg.keyboard.press("r")
+    # #2 alone plays from beat 44: the cursor starts on its first line and moves to its second
+    ev(pg, "S.tempo=160"); pg.click("#warmSel [data-v='2']")
+    pg.click("#warmPlay"); pg.wait_for_timeout(2600)
+    lines = pg.locator("#score .wline")
+    cur1 = lines.nth(0).locator("line.cursor").count() == 1
+    pg.wait_for_timeout(5400)
+    cur2 = lines.nth(1).locator("line.cursor").count() == 1
+    assert cur1 and cur2, (cur1, cur2)
+    pg.click("#warmPlay")
+    # ff is drawn tighter than two separate f's
+    kern = ev(pg, "[dynWidth('ff',38), 2*dynWidth('f',38)]"); assert kern[0] < kern[1]*0.8, kern
+    pg.click("#warmSel [data-v=both]")
+    pg.keyboard.press("p"); assert pg.is_visible("#pWarmSel")
+    pg.click("#pWarmSel [data-v='1']"); assert ev(pg, "S.warmSel") == "1"
+    pg.screenshot(path=f"{out}/warmup-present.png"); pg.keyboard.press("r")
     pg.screenshot(path=f"{out}/warmup-present-reveal.png"); pg.click("#pExit")
     pg.click("#dynView [data-v=random]"); assert pg.is_visible("#dynRandom")
     pg.uncheck("#labels"); pg.click("#tabArt")

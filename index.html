@@ -113,6 +113,10 @@ html.present body{background:var(--paper)}
 html.present #qWhich .opt svg{max-height:calc((100vh - 180px)/3)}
 html.present .quiz-msg{font-size:1.5rem;text-align:center}
 .wline + .wline{margin-top:-6px}
+.wlabel{font:800 1.25rem system-ui,sans-serif;color:#6d28d9;margin:6px 0 -6px 10px}
+.wlabel span{font-weight:600;color:#5d5a6b;font-size:.95rem;margin-left:6px}
+#presentBar #pWarmSel{display:flex;gap:4px;border:0}
+#presentBar #pWarmSel .btn.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
 html.present #score .wline svg{max-height:calc((100vh - 190px)/4)}
 html.board #score .wline svg{max-height:calc((100vh - 220px)/4)}
 #presentBar .tempo-ctl{display:flex;align-items:center;gap:6px;color:#fff;font-weight:700}
@@ -212,17 +216,14 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
       <span class="seg" id="dynView"><button data-v="random">🎲 Random practice</button><button data-v="warmup">🎯 Warm-up</button></span>
     </div>
     <div class="panel" id="warmUI">
-      <h3>Dynamics Warm-up — touch every level, then shape the sound</h3>
+      <h3>Dynamics Warm-up — touch every level, then shape the sound (plays in time)</h3>
       <div class="row" style="margin-top:4px">
-        <button class="btn primary" data-wp="all">▶ Whole warm-up</button>
-        <button class="btn" data-wp="0">▶ Dynamic ladder <span class="hint">mm. 1–6</span></button>
-        <button class="btn" data-wp="1">▶ Dynamic shapes <span class="hint">mm. 7–13</span></button>
-        <label class="hint" style="display:flex;align-items:center;gap:6px">Fermata hold
-          <select id="fermHold"><option value="0">no extra</option><option value="1">+1 beat</option><option value="2">+2 beats</option><option value="4">+4 beats</option></select></label>
+        <span class="seg" id="warmSel"><button data-v="1">#1 Dynamic ladder</button><button data-v="2">#2 Dynamic shapes</button><button data-v="both">Both</button></span>
+        <button class="btn primary" id="warmPlay">▶ Play</button>
       </div>
-      <p class="hint" style="margin:10px 0 0">Use it to introduce dynamics, then as a daily warm-up before mixing and matching. Each fermata note is a new level:
-      pp → p → mp → mf → f → ff and back down. Then the shapes: <b>fp</b> (loud attack, soft right away) &lt; f, f &gt; p, and p &lt; f &gt; p on one breath.
-      Turn on <b>Show loudness</b> to see each level as a step and each hairpin as a ramp.</p>
+      <p class="hint" style="margin:10px 0 0"><b>#1</b>: every level from pp up to ff and back down — play each half note, rest on the half rest.
+      <b>#2</b>: the shapes — <b>fp</b> (loud attack, soft right away) &lt; f, f &gt; p, and p &lt; f &gt; p on one breath.
+      Use #1 to introduce dynamics, then both as a daily warm-up before mixing and matching. Turn on <b>Show loudness</b> to see each level as a step and each hairpin as a ramp.</p>
     </div>
     <div id="dynRandom">
     <div class="row">
@@ -282,6 +283,7 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
   <button id="pReveal" class="btn">👁 Reveal</button>
   <button id="pMode" class="btn">🔊 Dynamics</button>
   <button id="pWarm" class="btn">🎯 Warm-up</button>
+  <span class="seg" id="pWarmSel"><button data-v="1" class="btn">#1</button><button data-v="2" class="btn">#2</button><button data-v="both" class="btn">Both</button></span>
   <span class="tempo-ctl"><button id="pSlower" class="btn" title="Slower">−</button><span id="pTempoVal">♩ = 80</span><button id="pFaster" class="btn" title="Faster">+</button></span>
   <button id="pExit" class="btn">✕ Exit</button>
 </div>
@@ -308,12 +310,12 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
 <div id="sharePop" class="hidden"></div>
 
 <script src="lib/vexflow-4.2.5.js"></script>
-<script src="js/theory.js?v=2.4.0"></script>
-<script src="js/model.js?v=2.4.0"></script>
-<script src="js/render.js?v=2.4.0"></script>
-<script src="js/audio.js?v=2.4.0"></script>
-<script src="js/quiz.js?v=2.4.0"></script>
-<script src="js/mic.js?v=2.4.0"></script>
-<script src="js/ui.js?v=2.4.0"></script>
+<script src="js/theory.js?v=2.4.1"></script>
+<script src="js/model.js?v=2.4.1"></script>
+<script src="js/render.js?v=2.4.1"></script>
+<script src="js/audio.js?v=2.4.1"></script>
+<script src="js/quiz.js?v=2.4.1"></script>
+<script src="js/mic.js?v=2.4.1"></script>
+<script src="js/ui.js?v=2.4.1"></script>
 </body>
 </html>

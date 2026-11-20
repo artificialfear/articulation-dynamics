@@ -22,8 +22,11 @@ function shapeMarkup(x,y,w,h,art,sound){
   m += `<rect x="${x}" y="${y}" width="${sw}" height="${h}" fill="none" stroke="#222" stroke-width="1.4" stroke-dasharray="3 2"/>`;
   return m;
 }
-function dynWidth(text,size){ let w=0; for(const ch of text) w+=new VF.Glyph(DYN_GLYPH[ch],size).getMetrics().width; return w; }
-function drawDyn(ctx,text,x,y,size){ let cx=x; for(const ch of text){ const g=new VF.Glyph(DYN_GLYPH[ch],size); g.render(ctx,cx,y); cx+=g.getMetrics().width; } return cx-x; }
+// kerning: the f glyph is wide, so "ff" reads as two separate letters unless the second one tucks in
+const DYN_KERN = { ff:0.42, fp:0.12, mf:0.06 };
+function dynAdvance(text,k,size){ const w=new VF.Glyph(DYN_GLYPH[text[k]],size).getMetrics().width; const pair=text.slice(k,k+2); return k<text.length-1 && DYN_KERN[pair]? w*(1-DYN_KERN[pair]) : w; }
+function dynWidth(text,size){ let w=0; for(let k=0;k<text.length;k++) w+=dynAdvance(text,k,size); return w; }
+function drawDyn(ctx,text,x,y,size){ let cx=x; for(let k=0;k<text.length;k++){ new VF.Glyph(DYN_GLYPH[text[k]],size).render(ctx,cx,y); cx+=dynAdvance(text,k,size); } return cx-x; }
 const noteCenter = sn => (sn.getNoteHeadBeginX()+sn.getNoteHeadEndX())/2;
 
 function padRests(measureNotes,offset){
@@ -181,7 +184,7 @@ function renderScore(host,cfg){
         const d=`M${pts[0][0]},${base} `+pts.map(p=>`L${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(" ")+` L${pts[K][0]},${base} Z`;
         svgEl("path",{d,fill:GREEN,stroke:"#3f7f1f","stroke-width":1},svg);
       });
-      svgText(svg,staves[0].getX()+2,base-4,"loudness",{size:11,anchor:"start",color:"#6b7280",italic:true});
+      svgText(svg,staves[0].getX()+2,base-laneH-3,"loudness",{size:11,anchor:"start",color:"#6b7280",italic:true});
       y=base+14;
     }
   }

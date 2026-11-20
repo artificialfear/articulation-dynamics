@@ -222,19 +222,20 @@ function timeMap(notes,hold){
            inHold:b=>notes.some(n=>n.ferm && b>n.start+1e-6 && b<n.start+DUR_BEATS[n.dur]-1e-6) };
 }
 
-/* ---------------- Dynamics Warm-up (Mat's example, 11/20) ----------------
-   Ladder pp → ff → pp on fermata half notes, then shapes: fp < f, f > p, p < f > p. */
-const WARMUP_LINES = [[0,4],[4,6],[6,10],[10,13]];            // measures per line
-const WARMUP_SECTIONS = [ {name:"Dynamic ladder", from:0, to:24, mm:"mm. 1–6"}, {name:"Dynamic shapes", from:24, to:52, mm:"mm. 7–13"} ];
+/* ---------------- Dynamics Warm-up (Mat's example, 11/20; in time, no fermatas) ----------------
+   #1 Dynamic ladder: half note + half rest on each level, pp → ff → pp (ends on a pp whole note).
+   #2 Dynamic shapes: fp < f, f > p, p < f > p on tied whole notes.  Everything plays in time with the board. */
+const WARMUP_LINES = [ {m:[0,6],ex:1}, {m:[6,11],ex:1}, {m:[11,15],ex:2}, {m:[15,18],ex:2} ];   // measures per line
+const WARMUP_EX = { 1:{name:"Dynamic ladder", from:0, to:44}, 2:{name:"Dynamic shapes", from:44, to:72} };
 function warmupNotes(){
   const out=[]; let pos=0;
   const add=(dur,o={})=>{ const n=Object.assign(blank(dur.replace("r",""),pos,dur.endsWith("r")),o); out.push(n); pos+=DUR_BEATS[n.dur]; return n; };
-  [0,1,2,3,4,5,4,3,2,1].forEach(d=>add("h",{dyn:d,ferm:true}));   // pp p | mp mf | f ff | f mf | mp p
-  add("w",{dyn:0,ferm:true});                                       // pp
+  [0,1,2,3,4,5,4,3,2,1].forEach(d=>{ add("h",{dyn:d}); add("hr"); });   // pp p mp mf f ff f mf mp p
+  add("w",{dyn:0});                                                       // pp
   const shape=(startDyn,hp1,midDyn,hp2,endDyn)=>{
-    add("w",{dyn:startDyn,ferm:true,hp:hp1,tie:true});
+    add("w",{dyn:startDyn,hp:hp1,tie:true});
     if(hp2) add("w",{dyn:midDyn,hp:hp2,tie:true});
-    add("8",{dyn:hp2?endDyn:midDyn}); add("8r"); add("qr"); add("hr",{ferm:true});
+    add("8",{dyn:hp2?endDyn:midDyn}); add("8r"); add("qr"); add("hr");
   };
   shape(FP,"cresc",4);              // fp < f
   shape(4,"dim",1);                 // f > p

@@ -59,15 +59,15 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
 - "Back to agenda" and Esc post `{artDyn:"close"}` to the parent.
 - Must run on the ViewBoard's Chrome ~87: no :is/:where/:has, aspect-ratio, `.at()`, `??=`, or emoji newer than Unicode 9. (🎚 rendered as a box in testing, so Dynamics uses 🔊.)
 
-## Dynamics Warm-up (2.4.0)
-- `warmupNotes()` and `WARMUP_LINES` / `WARMUP_SECTIONS` live in model.js, built from Mat's screenshot (11/20).
-  - Ladder: 10 fermata halves plus a pp whole.
-  - Shapes: whole notes tied to an eighth, then 8th rest, quarter rest, and a fermata half rest. The p<f>p shape goes whole~whole~eighth.
-- **Fermatas:** `n.ferm`, drawn as VexFlow "a@a". `timeMap(notes, hold)` stretches each fermata note by `hold` beats; audio, metronome (skips beats inside a hold), and cursor all use it.
+## Dynamics Warm-up (2.4.0, changed in 2.4.1)
+- `warmupNotes()`, `WARMUP_LINES` ({m:[m0,m1], ex}) and `WARMUP_EX` live in model.js, built from Mat's screenshot (11/20).
+  - 2.4.1 (Mat): no fermatas. Each ladder note is a half note + half rest, so it plays in time.
+  - #1 = the top two lines (beats 0–44); #2 = shapes fp<f, f>p, p<f>p (beats 44–72).
+  - `S.warmSel` = "1" | "2" | "both" (warm-up panel + Presentation bar `#pWarmSel`).
+- Fermata support is still in the engine (`n.ferm`, `timeMap`) but nothing uses it now.
 - **fp:** `DYNS[6]` / `FP`. Its level is p (`dynLevel`); playback gives it an attack boost of f/p.
-- **Multi-line rendering:** `renderScore` takes `measures`, `noTime`, `noEnd`, `L` (shared loudness curve), and `tieIn`, plus a tie that runs off the end of a line.
-  - ui.js `renderWarmup()` builds one render per line and returns `{lines, els}`; the cursor hops between lines.
-- Long tied notes follow the loudness curve inside the note (the envelope `curve`), so p<f>p on one tied note rises and falls.
+- **ff kerning:** `DYN_KERN` in render.js; `dynWidth` and `drawDyn` share `dynAdvance`.
+- **Multi-line rendering:** `renderScore` takes `measures`, `noTime`, `noEnd`, `L`, and `tieIn`. `renderWarmup()` adds "#1 / #2" labels and returns `{lines, els}` for a cursor that hops between lines.
 - Pitch is always concert F (concert B♭ if the pattern is single B♭): `warmPattern()`.
 
 ## Notes

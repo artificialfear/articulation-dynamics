@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.4.1 — 2026-11-20
+- Dynamics Warm-up now plays in time, with no fermatas:
+  - **#1 Dynamic ladder** (top two lines): each level is a half note followed by a half rest, pp → ff → pp, ending on a pp whole note.
+  - **#2 Dynamic shapes** (bottom two lines): fp < f, f > p, p < f > p.
+- Choose **#1, #2, or Both** in the warm-up panel or on the Presentation bar (and the agenda board). Play plays what's shown.
+- **ff** is drawn with the two f's closer together.
+- The "loudness" label sits above the lane so it never covers a bar.
+
 ## 2.4.0 — 2026-11-20
 - **Dynamics Warm-up** (Dynamics tab → 🎯 Warm-up, built from Mat's example):
   - **Dynamic ladder:** fermata half notes pp → p → mp → mf → f → ff → f → mf → mp → p → pp.
