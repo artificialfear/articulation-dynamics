@@ -39,33 +39,36 @@ function nearestSample(inst,midi){
 }
 
 /* one note: g0/g1 = level at start/end of the sound; boost = attack weight; decay = weight+decay shape */
-function envelope(env,t,len,g0,g1,boost,decay,legatoIn,scale=1){
+function envelope(env,t,len,g0,g1,boost,decay,legatoIn,scale=1,curve=null){
   const atk=legatoIn?0.045:0.018, rel=Math.min(0.04,len*0.3), peak=Math.min(0.95,g0*boost)*scale;
   env.gain.setValueAtTime(0.0001,t);
   env.gain.linearRampToValueAtTime(peak,t+atk);
   const sEnd=Math.max(t+atk+0.01,t+len-rel);
   if(decay) env.gain.linearRampToValueAtTime(g0*0.2*scale,sEnd);
   else {
-    if(boost>1){ const d=Math.min(0.16,len*0.5); env.gain.linearRampToValueAtTime(g0*scale,t+atk+d); }
+    let after=t+atk;
+    if(boost>1){ const d=Math.min(0.16,len*0.5); after=t+atk+d; env.gain.linearRampToValueAtTime(g0*scale,after); }
+    // loudness that changes inside one long note (e.g. tied p < f > p): follow the curve [[secondsFromStart, gain], …]
+    if(curve) curve.forEach(([dt,g])=>{ const tt=t+dt; if(tt>after && tt<sEnd) env.gain.linearRampToValueAtTime(g*scale,tt); });
     env.gain.linearRampToValueAtTime(g1*scale,sEnd);
   }
   env.gain.linearRampToValueAtTime(0.0001,t+len);
 }
-function synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn){
+function synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve){
   const o1=AC.createOscillator(), o2=AC.createOscillator(), filt=AC.createBiquadFilter(), env=AC.createGain(), mix=AC.createGain();
   o1.type=o2.type="sawtooth"; o1.frequency.value=o2.frequency.value=midiFreq(midi); o2.detune.value=7;
   filt.type="lowpass"; filt.Q.value=0.8; filt.frequency.value=500+Math.max(g0,g1)*5200;
   mix.gain.value=0.5; o1.connect(mix); o2.connect(mix); mix.connect(filt); filt.connect(env); env.connect(master);
-  envelope(env,t,len,g0,g1,boost,decay,legatoIn);
+  envelope(env,t,len,g0,g1,boost,decay,legatoIn,1,curve);
   o1.start(t); o2.start(t); o1.stop(t+len+0.05); o2.stop(t+len+0.05); live.push(o1,o2);
 }
-function sampleVoice(inst,t,len,g0,g1,boost,decay,midi,legatoIn){
-  const s=nearestSample(inst,midi); if(!s) return synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn);
+function sampleVoice(inst,t,len,g0,g1,boost,decay,midi,legatoIn,curve){
+  const s=nearestSample(inst,midi); if(!s) return synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve);
   const src=AC.createBufferSource(), env=AC.createGain();
   src.buffer=s.buf; src.playbackRate.value=Math.pow(2,(midi-s.m)/12);
   src.loop=true; src.loopStart=0.6; src.loopEnd=Math.max(0.9,Math.min(s.buf.duration-0.25,2.8));
   src.connect(env); env.connect(master);
-  envelope(env,t,len,g0,g1,boost,decay,legatoIn,s.buf._g);
+  envelope(env,t,len,g0,g1,boost,decay,legatoIn,s.buf._g,curve);
   src.start(t, legatoIn?0.12:0); src.stop(t+len+0.06); live.push(src);
 }
 let noiseBuf=null;
@@ -104,29 +107,36 @@ async function playExample(o){
     }
   }
   const spb=60/o.tempo; let t=AC.currentTime+0.12;
-  const total=beatsFor(o.mode);
+  const total=o.total||beatsFor(o.mode), tm=o.tm||null, T=b=>tm? tm.toTime(b) : b;
+  const from=o.from||0, to=o.to==null? total : o.to;
   const countT=t;
   if(o.countin){ if(!o.noCountClicks) for(let b=0;b<4;b++) click(t+b*spb,b===0); t+=4*spb; }
-  const t0=t;
-  if(o.metro) for(let b=0;b<total;b++) click(t0+b*spb,b%4===0,0.55);
+  const t0=t-T(from)*spb;                                   // so `from` lands right after the count-off
+  if(o.metro) for(let b=Math.ceil(from);b<to;b++){ if(tm && tm.inHold(b)) continue; click(t0+T(b)*spb,b%4===0,0.55); }
   const L = o.mode==="dyn"? levelFn(o.notes) : null;
   const base=DYN_GAIN[3];
   playPlan(o.notes,o.mode).forEach(ev=>{
-    const st=t0+ev.start*spb, len=Math.max(0.07, ev.sound*spb + (ev.legatoOut?0.03:0));
+    if(ev.start<from-1e-6 || ev.start>=to-1e-6) return;
+    const st=t0+T(ev.start)*spb, en=t0+T(ev.start+ev.sound)*spb;
+    const len=Math.max(0.07, en-st + (ev.legatoOut?0.03:0));
     const midi=concertMidi(o.inst,o.pattern,ev.p);
     const g0 = L? lvlGain(L(ev.start)) : base;
     const g1 = L? lvlGain(L(ev.start+ev.sound)) : base;
-    const boost = ev.legatoIn? 1 : ev.boost;
+    let curve=null;
+    if(L && ev.sound>1){ curve=[]; const K=Math.ceil(ev.sound*4); for(let k=1;k<K;k++){ const b=ev.start+ev.sound*k/K; curve.push([t0+T(b)*spb-st, lvlGain(L(b))]); } }
+    const first=o.notes[ev.idxs[0]];
+    let boost = ev.legatoIn? 1 : ev.boost;
+    if(o.mode==="dyn" && first.dyn===FP) boost=DYN_GAIN[4]/DYN_GAIN[1];   // fp: forte attack, then piano
     if(o.inst.perc) snareVoice(st,g0,boost);
-    else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn);
-    else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn);
+    else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve);
+    else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve);
     if(o.render) ev.idxs.forEach(i=>{
-      const n=o.notes[i], a=t0+n.start*spb, b=a+DUR_BEATS[n.dur]*spb*0.92;
+      const n=o.notes[i], a=t0+T(n.start)*spb, b=t0+T(n.start+DUR_BEATS[n.dur]*0.92)*spb;
       at(a,()=>highlight(o.render,i,true)); at(b,()=>highlight(o.render,i,false));
     });
   });
-  if(o.cursor && o.render) startCursor(o.render,t0,spb,total);
-  at(t0+total*spb+0.06,()=>{ if(token===playToken){ stopPlayback(); o.onEnd&&o.onEnd(); } });
+  if(o.cursor && o.render) startCursor(o.render,t0,spb,total,tm,from,to);
+  at(t0+T(to)*spb+0.06,()=>{ if(token===playToken){ stopPlayback(); o.onEnd&&o.onEnd(); } });
   return {t0,spb,countT,total};
 }
 function highlight(render,i,on){ const el=render.els[i]; if(el) el.classList.toggle("play",on); }
@@ -142,14 +152,24 @@ function stopPlayback(){
 
 /* ---------- cursor ---------- */
 let cursorRAF=0, cursorEl=null;
-function startCursor(render,t0,spb,total){
+function startCursor(render,t0,spb,total,tm,from=0,to=total){
   removeCursor();
-  const ln=svgEl("line",{y1:render.top,y2:render.bot,stroke:"#db2777","stroke-width":3,"stroke-linecap":"round",opacity:0.75,class:"cursor"},render.svg);
-  ln.style.pointerEvents="none"; cursorEl=ln;
+  // a render with .lines = several staves (warm-up): the cursor hops to the line that's playing
+  const lines = render.lines || [{render,b0:0,b1:total}];
+  let cur=null;
+  const place=ln=>{
+    if(cur===ln) return; if(cursorEl) cursorEl.remove();
+    const r=ln.render; cursorEl=svgEl("line",{y1:r.top,y2:r.bot,stroke:"#db2777","stroke-width":3,"stroke-linecap":"round",opacity:0.75,class:"cursor"},r.svg);
+    cursorEl.style.pointerEvents="none"; cur=ln;
+  };
+  place(lines.find(l=>from>=l.b0 && from<l.b1)||lines[0]);
   const tick=()=>{
     if(!cursorEl) return;
-    const beat=Math.min(total,(AC.currentTime-t0)/spb), x=beatToX(render.anchors,Math.max(0,beat));
-    cursorEl.setAttribute("x1",x); cursorEl.setAttribute("x2",x); cursorEl.setAttribute("opacity",beat<0?"0.3":"0.75");
+    const tb=(AC.currentTime-t0)/spb, beat=Math.max(from,Math.min(to,tm? tm.toBeat(tb) : tb));
+    const ln=lines.find(l=>beat>=l.b0 && beat<l.b1) || lines[lines.length-1];
+    place(ln);
+    const x=beatToX(ln.render.anchors, beat-ln.b0);
+    cursorEl.setAttribute("x1",x); cursorEl.setAttribute("x2",x); cursorEl.setAttribute("opacity", AC.currentTime<t0+(tm?tm.toTime(from):from)*spb?"0.3":"0.75");
     cursorRAF=requestAnimationFrame(tick);
   };
   tick();

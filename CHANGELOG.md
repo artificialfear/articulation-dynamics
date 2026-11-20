@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.4.0 — 2026-11-20
+- **Dynamics Warm-up** (Dynamics tab → 🎯 Warm-up, built from Mat's example):
+  - **Dynamic ladder:** fermata half notes pp → p → mp → mf → f → ff → f → mf → mp → p → pp.
+  - **Dynamic shapes:** fp < f, f > p, and p < f > p on tied whole notes.
+- Play the whole warm-up or just one section. Fermata hold: +0 / 1 / 2 / 4 beats.
+- The metronome pauses during holds, and the cursor moves through all four lines.
+- Pitch: concert F (or B♭ when Settings is on single B♭), in each student's written key.
+- On the agenda board and in Presentation mode, Dynamics has a 🎯 Warm-up / 🎲 Random button.
+- New marking **fp** (forte-piano): a loud attack, then soft right away. It's in the dynamics palette and the symbol guide.
+
 ## 2.3.0 — 2026-11-20
 - **Agenda board mode** (`?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=…`): opens straight into Presentation mode as "Articulation of the Day" or "Dynamics of the Day."
   - Uses the class's level and the same example all day for that class.

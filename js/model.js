@@ -28,9 +28,12 @@ const SHAPE = {
   marc:  { sound:0.50, decay:true,  pct:"50% Sound / 50% Space · Weight + Decay" },
 };
 const DYN_SUSTAIN = 0.95;
-const DYNS = ["pp","p","mp","mf","f","ff"];
-const DYN_NAME = { pp:"pianissimo", p:"piano", mp:"mezzo piano", mf:"mezzo forte", f:"forte", ff:"fortissimo" };
-const DYN_MEAN = { pp:"Very soft", p:"Soft", mp:"Medium soft", mf:"Medium loud", f:"Loud", ff:"Very loud" };
+// index 6 = fp (forte-piano): a loud attack that drops right away to p. It sits at p's level for loudness.
+const DYNS = ["pp","p","mp","mf","f","ff","fp"];
+const DYN_NAME = { pp:"pianissimo", p:"piano", mp:"mezzo piano", mf:"mezzo forte", f:"forte", ff:"fortissimo", fp:"forte-piano" };
+const DYN_MEAN = { pp:"Very soft", p:"Soft", mp:"Medium soft", mf:"Medium loud", f:"Loud", ff:"Very loud", fp:"Loud attack, then soft right away" };
+const FP=6;
+const dynLevel = d => d===FP? 1 : d;
 const DYN_GAIN = [0.05, 0.10, 0.17, 0.26, 0.40, 0.58];
 const DUR_BEATS = { w:4, h:2, q:1, "8":0.5 };
 
@@ -172,7 +175,7 @@ function dynWarnings(notes){
     if(!n.hp) return;
     let from=null; for(let k=i;k>=0;k--) if(notes[k].dyn!==null){ from=notes[k].dyn; break; }
     const j=hpEnd(notes,i); if(j<0||from===null) return;
-    const to=notes[j].dyn;
+    const to=dynLevel(notes[j].dyn); from=dynLevel(from);
     if(n.hp==="cresc" && to<=from) out.push(`Crescendo on note ${i+1} leads to ${DYNS[to]}, which isn't louder than ${DYNS[from]}.`);
     if(n.hp==="dim" && to>=from) out.push(`Decrescendo on note ${i+1} leads to ${DYNS[to]}, which isn't softer than ${DYNS[from]}.`);
   });
@@ -181,17 +184,17 @@ function dynWarnings(notes){
 /* loudness level (fractional index into DYN_GAIN) as a function of beat */
 function levelFn(notes){
   const marks=notes.map((n,i)=>i).filter(i=>notes[i].dyn!==null);
-  const first = marks.length? notes[marks[0]].dyn : 3;
+  const first = marks.length? dynLevel(notes[marks[0]].dyn) : 3;
   const total = notes.length? Math.ceil((notes[notes.length-1].start+DUR_BEATS[notes[notes.length-1].dur])/4)*4 : 8;
   const events=[];
   notes.forEach((n,i)=>{
-    if(n.dyn!==null) events.push({beat:n.start,set:n.dyn});
+    if(n.dyn!==null) events.push({beat:n.start,set:dynLevel(n.dyn)});
     if(n.hp){
       const j=hpEnd(notes,i);
-      let from=null; for(let k=i;k>=0;k--) if(notes[k].dyn!==null){ from=notes[k].dyn; break; }
+      let from=null; for(let k=i;k>=0;k--) if(notes[k].dyn!==null){ from=dynLevel(notes[k].dyn); break; }
       if(from===null) from=first;
       const endBeat = j>=0? notes[j].start : total;
-      const to = j>=0? notes[j].dyn : Math.max(0,Math.min(5,from+(n.hp==="cresc"?2:-2)));
+      const to = j>=0? dynLevel(notes[j].dyn) : Math.max(0,Math.min(5,from+(n.hp==="cresc"?2:-2)));
       events.push({beat:n.start,ramp:[endBeat,from,to]});
     }
   });
@@ -203,6 +206,41 @@ function levelFn(notes){
   };
 }
 function lvlGain(l){ l=Math.max(0,Math.min(5,l)); const a=Math.floor(l), b=Math.min(5,a+1), f=l-a; return DYN_GAIN[a]+(DYN_GAIN[b]-DYN_GAIN[a])*f; }
+
+/* ---------------- fermatas ----------------
+   A fermata note (n.ferm) is held `hold` extra beats; everything after it moves later.
+   timeMap gives beat → playback time (in beats) and back, for audio, the metronome and the cursor. */
+function timeMap(notes,hold){
+  const knots=[[0,0]]; let shift=0, last=0;
+  notes.forEach(n=>{
+    const a=n.start, b=n.start+DUR_BEATS[n.dur]; last=Math.max(last,b);
+    if(n.ferm && hold>0){ knots.push([a,a+shift]); shift+=hold; knots.push([b,b+shift]); }
+  });
+  knots.push([Math.max(last,knots[knots.length-1][0]), Math.max(last,knots[knots.length-1][0])+shift]);
+  const interp=(x,i,o)=>{ for(let k=1;k<knots.length;k++){ const A=knots[k-1],B=knots[k]; if(x<=B[i]) return B[i]===A[i]? B[o] : A[o]+(B[o]-A[o])*(x-A[i])/(B[i]-A[i]); } const L=knots[knots.length-1]; return L[o]+(x-L[i]); };
+  return { toTime:b=>interp(b,0,1), toBeat:t=>interp(t,1,0), extra:shift,
+           inHold:b=>notes.some(n=>n.ferm && b>n.start+1e-6 && b<n.start+DUR_BEATS[n.dur]-1e-6) };
+}
+
+/* ---------------- Dynamics Warm-up (Mat's example, 11/20) ----------------
+   Ladder pp → ff → pp on fermata half notes, then shapes: fp < f, f > p, p < f > p. */
+const WARMUP_LINES = [[0,4],[4,6],[6,10],[10,13]];            // measures per line
+const WARMUP_SECTIONS = [ {name:"Dynamic ladder", from:0, to:24, mm:"mm. 1–6"}, {name:"Dynamic shapes", from:24, to:52, mm:"mm. 7–13"} ];
+function warmupNotes(){
+  const out=[]; let pos=0;
+  const add=(dur,o={})=>{ const n=Object.assign(blank(dur.replace("r",""),pos,dur.endsWith("r")),o); out.push(n); pos+=DUR_BEATS[n.dur]; return n; };
+  [0,1,2,3,4,5,4,3,2,1].forEach(d=>add("h",{dyn:d,ferm:true}));   // pp p | mp mf | f ff | f mf | mp p
+  add("w",{dyn:0,ferm:true});                                       // pp
+  const shape=(startDyn,hp1,midDyn,hp2,endDyn)=>{
+    add("w",{dyn:startDyn,ferm:true,hp:hp1,tie:true});
+    if(hp2) add("w",{dyn:midDyn,hp:hp2,tie:true});
+    add("8",{dyn:hp2?endDyn:midDyn}); add("8r"); add("qr"); add("hr",{ferm:true});
+  };
+  shape(FP,"cresc",4);              // fp < f
+  shape(4,"dim",1);                 // f > p
+  shape(1,"cresc",4,"dim",1);       // p < f > p
+  return out;
+}
 
 /* ---------------- playback plan ----------------
    One event per sounding note-group (ties merged). Times in beats.

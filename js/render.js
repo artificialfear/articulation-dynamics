@@ -45,13 +45,16 @@ function beatToX(anchors,beat){
 /* cfg: {mode, notes, inst, pattern, showArts, showDyns, labels, shapes, qmarks, marks, width, hideIdx} */
 function renderScore(host,cfg){
   host.innerHTML="";
-  const inst=cfg.inst, M=measuresFor(cfg.mode), notes=cfg.notes;
+  const inst=cfg.inst, M=cfg.measures||measuresFor(cfg.mode), notes=cfg.notes;
   const W = cfg.width || (M===1? 760 : 1000);
   const r=new VF.Renderer(host,VF.Renderer.Backends.SVG); r.resize(W,500);
   const ctx=r.getContext(), svg=ctx.svg;
   const key=writtenKey(inst,cfg.pattern), clef=inst.clef, Y=70;
   const split=Math.round(W*0.515);
-  const geo = M===1? [[10,W-20]] : [[10,split-10],[split,W-split-10]];
+  let geo;
+  if(M===1) geo=[[10,W-20]];
+  else if(M===2 && !cfg.measures) geo=[[10,split-10],[split,W-split-10]];
+  else { const first=96, rest=(W-20-first)/M; geo=[]; for(let m=0;m<M;m++) geo.push([m===0?10:10+first+rest*m, m===0? first+rest : rest]); }
   const vfn=new Array(notes.length).fill(null);
   const items=[]; // every tickable with its beat (for spacing, shape bars, and the cursor)
   const staves=[];
@@ -59,8 +62,8 @@ function renderScore(host,cfg){
 
   geo.forEach(([x,w],m)=>{
     const stave=new VF.Stave(x,Y,w);
-    if(m===0){ stave.addClef(clef); if(key!=="C") stave.addKeySignature(key); stave.addTimeSignature("4/4"); }
-    if(m===M-1) stave.setEndBarType(VF.Barline.type.END);
+    if(m===0){ stave.addClef(clef); if(key!=="C") stave.addKeySignature(key); if(!cfg.noTime) stave.addTimeSignature("4/4"); }
+    if(m===M-1 && !cfg.noEnd) stave.setEndBarType(VF.Barline.type.END);
     stave.setContext(ctx).draw(); staves.push(stave);
     const idx=notes.map((n,i)=>i).filter(i=>Math.floor(notes[i].start/4+1e-9)===m);
     const tick=[];
@@ -86,6 +89,7 @@ function renderScore(host,cfg){
         vfn[i].addModifier(new VF.Articulation(c).setPosition(pos),0);
       });
     });
+    idx.forEach(i=>{ if(notes[i].ferm) vfn[i].addModifier(new VF.Articulation("a@a").setPosition(VF.Modifier.Position.ABOVE),0); });
     const voice=new VF.Voice({num_beats:4,beat_value:4}).setMode(VF.Voice.Mode.SOFT).addTickables(tick.concat(pads));
     if(!inst.perc) VF.Accidental.applyAccidentals([voice], key);
     new VF.Formatter({softmaxFactor:150}).joinVoices([voice]).formatToStave([voice],stave);
@@ -96,7 +100,10 @@ function renderScore(host,cfg){
   notes.forEach((n,i)=>{
     if(n.tie && vfn[i] && vfn[i+1] && !notes[i+1].rest)
       new VF.StaveTie({first_note:vfn[i],last_note:vfn[i+1],first_indices:[0],last_indices:[0]}).setContext(ctx).draw();
+    else if(n.tie && vfn[i] && i===notes.length-1)                     // continues on the next line
+      new VF.StaveTie({first_note:vfn[i],last_note:null,first_indices:[0],last_indices:[0]}).setContext(ctx).draw();
   });
+  if(cfg.tieIn && vfn[0]) new VF.StaveTie({first_note:null,last_note:vfn[0],first_indices:[0],last_indices:[0]}).setContext(ctx).draw();
   for(let i=0;i<notes.length;i++){
     if(!notes[i].sl || notes[i].rest) continue;
     let j=i; while(notes[j].sl && j+1<notes.length && !notes[j+1].rest) j++;
@@ -166,7 +173,7 @@ function renderScore(host,cfg){
     y = dy + (cfg.labels? 34 : 14);
     if(cfg.shapes && cfg.showDyns){
       // loudness lane: how loud each note is across time
-      const laneH=34, base=y+laneH, L=levelFn(notes);
+      const laneH=34, base=y+laneH, L=cfg.L||levelFn(notes);
       svgEl("line",{x1:staves[0].getNoteStartX()-6,x2:endX,y1:base,y2:base,stroke:"#9aa0ad","stroke-width":1},svg);
       playPlan(notes,"dyn").forEach(ev=>{
         const pts=[]; const b0=ev.start, b1=ev.start+ev.sound, K=16;

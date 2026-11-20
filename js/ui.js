@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.3.0";
+const VERSION = "2.4.0";
 const $ = id => document.getElementById(id);
 /* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
    Opens in presentation mode with the class's level; nothing is saved on the board. */
@@ -43,7 +43,11 @@ const S = {
   dynOpt: Object.assign({rests:false,slurs:true,ties:true}, store.get("dynOpt",{})),
   art:{notes:[],sel:-1}, dyn:{notes:[],sel:-1},
   present:false, reveal:false, presentFs:false, dynRange:[0,5],
+  dynView: store.get("dynView","random"), hold: store.get("fermHold",2),
 };
+const WARM = warmupNotes();
+const isWarm = () => S.mode==="dyn" && S.dynView==="warmup";
+const warmPattern = () => S.pattern==="single_Bb"? "single_Bb" : "single_F";   // the warm-up is a long-tone on concert F (or B♭)
 if(!INST_BY[S.inst]) S.inst="concertT";
 if(!PATTERNS[S.pattern]) S.pattern="single_F";
 if(S.mode==="quiz" && typeof Quiz==="undefined") S.mode="art";
@@ -69,6 +73,7 @@ function setStatus(t){ $("status").textContent=t||""; }
 function draw(){
   stopPlayback(); closeShare();
   if(S.mode==="quiz"){ Quiz.draw(); updateChrome(); return; }
+  if(isWarm()){ R=renderWarmup(); updateChrome(); return; }
   const s=st();
   R=renderScore($("score"),{
     mode:S.mode, notes:s.notes, inst:inst(), pattern:S.pattern, showArts:true, showDyns:true,
@@ -79,6 +84,29 @@ function draw(){
   if(S.mode==="dyn") $("dWarn").textContent=dynWarnings(s.notes).join(" ");
   if(typeof Mic!=="undefined" && Mic.onDraw) Mic.onDraw(R);
 }
+/* the warm-up: one staff per line, sharing one loudness curve and one cursor */
+function renderWarmup(){
+  const host=$("score"); host.innerHTML="";
+  const LW=levelFn(WARM), lines=[], els=new Array(WARM.length).fill(null);
+  WARMUP_LINES.forEach(([m0,m1],k)=>{
+    const d=document.createElement("div"); d.className="wline"; host.appendChild(d);
+    const idx=WARM.map((n,i)=>i).filter(i=>WARM[i].start>=m0*4 && WARM[i].start<m1*4);
+    const sub=idx.map(i=>Object.assign(clone(WARM[i]),{start:WARM[i].start-m0*4}));
+    const r=renderScore(d,{mode:"dyn",notes:sub,inst:inst(),pattern:warmPattern(),showArts:false,showDyns:true,
+      labels: S.present? S.reveal : S.labels, shapes: S.present? S.reveal : S.shapes,
+      measures:m1-m0, noTime:k>0, noEnd:k<WARMUP_LINES.length-1, L:b=>LW(b+m0*4), width:1000,
+      tieIn: idx[0]>0 && WARM[idx[0]-1].tie});
+    idx.forEach((gi,j)=>els[gi]=r.els[j]);
+    lines.push({render:r,b0:m0*4,b1:m1*4});
+  });
+  return {lines,els,xs:[],svg:lines[0].render.svg,anchors:[]};
+}
+function playWarm(sec){
+  const s = sec==null? {from:0,to:filled(WARM)} : WARMUP_SECTIONS[sec];
+  playExample({notes:WARM, mode:"dyn", inst:inst(), pattern:warmPattern(), tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor,
+    sound:S.sound, tm:timeMap(WARM,S.hold), total:filled(WARM), from:s.from, to:s.to, onStatus:setStatus});
+  setPlayLabels(true);
+}
 function applySel(){ if(!R) return; const sel=st().sel; R.els.forEach((el,i)=>el&&el.classList.toggle("sel",i===sel)); }
 function nearestNote(render,e){
   const svg=render.svg, pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY;
@@ -88,7 +116,7 @@ function nearestNote(render,e){
 }
 $("score").addEventListener("click",e=>{
   if(S.mode==="quiz"){ Quiz.onScoreClick(e); return; }
-  if(!R || S.present) return;
+  if(!R || S.present || isWarm()) return;
   const i=nearestNote(R,e), s=st();
   s.sel = (s.sel===i)? -1 : i;
   applySel(); updatePanels();
@@ -115,7 +143,7 @@ function buildStatic(){
   toolButtons($("aTools"),"art");
   // dynamics palettes
   const dp=$("dPal"); dp.innerHTML="";
-  [null,0,1,2,3,4,5].forEach(l=>mkBtn(dp,`<span class="sym">${l===null?NONE_SYM:dynGlyph(DYNS[l])}</span><span class="nm">${l===null?"None":DYN_NAME[DYNS[l]]}</span>`,()=>editSel(n=>n.dyn=l),{dyn:l===null?"":l}));
+  [null,0,1,2,3,4,5,FP].forEach(l=>mkBtn(dp,`<span class="sym">${l===null?NONE_SYM:dynGlyph(DYNS[l])}</span><span class="nm">${l===null?"None":DYN_NAME[DYNS[l]]}</span>`,()=>editSel(n=>n.dyn=l),{dyn:l===null?"":l}));
   const hp=$("hPal"); hp.innerHTML="";
   [[null,"No hairpin"],["cresc","Crescendo"],["dim","Decrescendo"]].forEach(([t,nm])=>mkBtn(hp,`<span class="sym">${t?hairGlyph(t):NONE_SYM}</span><span class="nm">${nm}</span>`,()=>editSel(n=>n.hp=t),{hp:t||""}));
   toolButtons($("dTools"),"dyn");
@@ -194,10 +222,17 @@ function updateChrome(){
   $("pReveal").textContent = m==="quiz"? "👁 Reveal" : (S.reveal? "🙈 Hide shapes" : "👁 Show shapes");
   $("pTempoVal").textContent = "♩ = "+S.tempo;
   $("pMode").classList.toggle("hidden", m==="quiz");
+  const warm=isWarm();
+  $("pWarm").classList.toggle("hidden", m!=="dyn");
+  $("pWarm").textContent = warm? "🎲 Random" : "🎯 Warm-up";
+  $("warmUI").classList.toggle("hidden",!warm); $("dynRandom").classList.toggle("hidden",warm);
+  $("dynView").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.v===S.dynView));
+  if(m==="dyn") $("share").classList.toggle("hidden",warm);
   $("pMode").textContent = m==="art"? "🔊 Dynamics" : "🎵 Articulation";
   if(BOARD){
     const lv=LEVELS[QS.get("lvl")]||LEVELS["7th"];
-    $("boardTitle").innerHTML = `<b>${m==="art"?"🎵 Articulation":"🔊 Dynamics"} of the Day</b> · ${lv.name} · <span>play on concert F</span>`;
+    $("boardTitle").innerHTML = isWarm()? `<b>🎯 Dynamics Warm-up</b> · ${lv.name} · <span>play on concert F</span>`
+      : `<b>${m==="art"?"🎵 Articulation":"🔊 Dynamics"} of the Day</b> · ${lv.name} · <span>play on concert F</span>`;
   }
   if(m!=="quiz" && $("banner")) $("banner").classList.add("hidden");
 }
@@ -228,6 +263,7 @@ function buildRefs(){
 function play(){
   if(playing){ stopPlayback(); return; }
   if(S.mode==="quiz"){ Quiz.play(); }
+  else if(isWarm()){ playWarm(null); return; }
   else playExample({notes:st().notes, mode:S.mode, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor, sound:S.sound, onStatus:setStatus});
   setPlayLabels(true);
 }
@@ -243,6 +279,7 @@ function setMode(m){
 }
 function newHere(){
   if(S.mode==="quiz") return Quiz.newQuestion();
+  if(isWarm()){ S.dynView="random"; store.set("dynView","random"); }
   S[S.mode].notes=newExample(S.mode); S[S.mode].sel=-1; S.reveal=false; dirty(); draw();
 }
 
@@ -301,6 +338,10 @@ $("present").onclick=()=> S.present? exitPresent() : enterPresent();
 $("pExit").onclick=exitPresent;
 $("pPlay").onclick=play;
 $("pNew").onclick=()=>newHere();
+$("pWarm").onclick=()=>{ S.dynView = S.dynView==="warmup"? "random" : "warmup"; store.set("dynView",S.dynView); S.reveal=false; draw(); };
+$("dynView").querySelectorAll("button").forEach(b=>b.onclick=()=>{ S.dynView=b.dataset.v; store.set("dynView",S.dynView); draw(); });
+document.querySelectorAll("[data-wp]").forEach(b=>b.onclick=()=>{ stopPlayback(); playWarm(b.dataset.wp==="all"? null : +b.dataset.wp); });
+$("fermHold").value=String(S.hold); $("fermHold").onchange=e=>{ S.hold=+e.target.value; store.set("fermHold",S.hold); };
 $("pMode").onclick=()=>{ S.mode = S.mode==="art"? "dyn" : "art"; S.reveal=false; draw(); };
 function nudgeTempo(d){ S.tempo=Math.max(50,Math.min(160,S.tempo+d)); store.set("tempo",S.tempo); $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm"; updateChrome(); }
 $("pSlower").onclick=()=>nudgeTempo(-4); $("pFaster").onclick=()=>nudgeTempo(4);
@@ -357,6 +398,7 @@ document.addEventListener("keydown",e=>{
   if(k==="r"||k==="R"){ $("pReveal").click(); return; }
   if(k==="Escape"){ if(S.present){ exitPresent(); return; } closeDrawer(); closeShare(); if(S.mode!=="quiz"){ st().sel=-1; applySel(); updatePanels(); } return; }
   if(S.mode==="quiz"){ Quiz.onKey && Quiz.onKey(e); return; }
+  if(isWarm()) return;
   const s=st(); const notes=s.notes;
   const selectable=notes.map((n,i)=>i).filter(i=>!notes[i].rest);
   if(k==="ArrowRight"||k==="ArrowLeft"){
