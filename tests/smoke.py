@@ -280,6 +280,16 @@ with sync_playwright() as p:
     cur2 = lines.nth(1).locator("line.cursor").count() == 1
     assert cur1 and cur2, (cur1, cur2)
     pg.click("#warmPlay")
+    # fp is two events: loud for ~half a beat, then piano (render the warm-up's fp offline and measure it)
+    fpq = ev(pg, """async()=>{
+      const sr=22050, oac=new OfflineAudioContext(1,sr*3,sr), g=oac.createGain(); const env=oac.createGain();
+      const o=oac.createOscillator(); o.frequency.value=220; o.connect(env); env.connect(oac.destination);
+      envelope(env,0,2.5,DYN_GAIN[1],DYN_GAIN[1],1,false,false,1,null,{g:DYN_GAIN[4],hold:0.375,drop:0.06});
+      o.start(0); o.stop(2.6); const b=await oac.startRendering(), d=b.getChannelData(0);
+      const rms=(a,z)=>{ let s=0; for(let i=Math.floor(a*sr);i<z*sr;i++) s+=d[i]*d[i]; return Math.sqrt(s/((z-a)*sr)); };
+      return [rms(0.05,0.35), rms(0.6,2.0)]; }""")
+    assert fpq[0] > 3 * fpq[1], ("fp: forte part should be clearly louder than the piano part", fpq)
+    assert ev(pg, "(()=>{ const src=String(playExample); return src.includes('hold:Math.max(0.25') })()")
     # ff is drawn tighter than two separate f's
     kern = ev(pg, "[dynWidth('ff',38), 2*dynWidth('f',38)]"); assert kern[0] < kern[1]*0.8, kern
     pg.click("#warmSel [data-v=both]")

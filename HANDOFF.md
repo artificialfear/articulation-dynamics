@@ -65,7 +65,9 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
   - #1 = the top two lines (beats 0–44); #2 = shapes fp<f, f>p, p<f>p (beats 44–72).
   - `S.warmSel` = "1" | "2" | "both" (warm-up panel + Presentation bar `#pWarmSel`).
 - Fermata support is still in the engine (`n.ferm`, `timeMap`) but nothing uses it now.
-- **fp:** `DYNS[6]` / `FP`. Its level is p (`dynLevel`); playback gives it an attack boost of f/p.
+- **fp:** `DYNS[6]` / `FP`. Its level is p (`dynLevel`).
+  - 2.4.2 (Mat: "two separate events, loud then soft"): `envelope(..., fp={g, hold, drop})` holds the f gain for hold = 0.5 beat (clamped 0.25–0.45 s), then ramps to p over 0.06 s. The synth filter follows.
+  - The smoke test renders the envelope offline and checks that the forte part is more than 3x the piano part.
 - **ff kerning:** `DYN_KERN` in render.js; `dynWidth` and `drawDyn` share `dynAdvance`.
 - **Multi-line rendering:** `renderScore` takes `measures`, `noTime`, `noEnd`, `L`, and `tieIn`. `renderWarmup()` adds "#1 / #2" labels and returns `{lines, els}` for a cursor that hops between lines.
 - Pitch is always concert F (concert B♭ if the pattern is single B♭): `warmPattern()`.

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.2 — 2026-11-20
+- **fp** now plays as two events: it holds forte for about half a beat (0.25–0.45 s, depending on tempo), then drops quickly to piano. A crescendo after it starts from that piano.
+
 ## 2.4.1 — 2026-11-20
 - Dynamics Warm-up now plays in time, with no fermatas:
   - **#1 Dynamic ladder** (top two lines): each level is a half note followed by a half rest, pp → ff → pp, ending on a pp whole note.

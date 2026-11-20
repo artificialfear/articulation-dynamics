@@ -39,7 +39,8 @@ function nearestSample(inst,midi){
 }
 
 /* one note: g0/g1 = level at start/end of the sound; boost = attack weight; decay = weight+decay shape */
-function envelope(env,t,len,g0,g1,boost,decay,legatoIn,scale=1,curve=null){
+/* fp = {g, hold, drop}: forte-piano as two events — hold forte for `hold` s, then drop to piano over `drop` s */
+function envelope(env,t,len,g0,g1,boost,decay,legatoIn,scale=1,curve=null,fp=null){
   const atk=legatoIn?0.045:0.018, rel=Math.min(0.04,len*0.3), peak=Math.min(0.95,g0*boost)*scale;
   env.gain.setValueAtTime(0.0001,t);
   env.gain.linearRampToValueAtTime(peak,t+atk);
@@ -47,28 +48,34 @@ function envelope(env,t,len,g0,g1,boost,decay,legatoIn,scale=1,curve=null){
   if(decay) env.gain.linearRampToValueAtTime(g0*0.2*scale,sEnd);
   else {
     let after=t+atk;
-    if(boost>1){ const d=Math.min(0.16,len*0.5); after=t+atk+d; env.gain.linearRampToValueAtTime(g0*scale,after); }
+    if(fp){
+      env.gain.setValueAtTime(0.0001,t); env.gain.linearRampToValueAtTime(Math.min(0.95,fp.g)*scale,t+atk);
+      const h=Math.min(t+atk+fp.hold, sEnd-0.02), d=Math.min(h+fp.drop, sEnd-0.01);
+      env.gain.setValueAtTime(Math.min(0.95,fp.g)*scale,h); env.gain.linearRampToValueAtTime(g0*scale,d);
+      after=d;
+    } else if(boost>1){ const d=Math.min(0.16,len*0.5); after=t+atk+d; env.gain.linearRampToValueAtTime(g0*scale,after); }
     // loudness that changes inside one long note (e.g. tied p < f > p): follow the curve [[secondsFromStart, gain], …]
     if(curve) curve.forEach(([dt,g])=>{ const tt=t+dt; if(tt>after && tt<sEnd) env.gain.linearRampToValueAtTime(g*scale,tt); });
     env.gain.linearRampToValueAtTime(g1*scale,sEnd);
   }
   env.gain.linearRampToValueAtTime(0.0001,t+len);
 }
-function synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve){
+function synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp){
   const o1=AC.createOscillator(), o2=AC.createOscillator(), filt=AC.createBiquadFilter(), env=AC.createGain(), mix=AC.createGain();
   o1.type=o2.type="sawtooth"; o1.frequency.value=o2.frequency.value=midiFreq(midi); o2.detune.value=7;
   filt.type="lowpass"; filt.Q.value=0.8; filt.frequency.value=500+Math.max(g0,g1)*5200;
   mix.gain.value=0.5; o1.connect(mix); o2.connect(mix); mix.connect(filt); filt.connect(env); env.connect(master);
-  envelope(env,t,len,g0,g1,boost,decay,legatoIn,1,curve);
+  envelope(env,t,len,g0,g1,boost,decay,legatoIn,1,curve,fp);
+  if(fp){ const c=v=>500+v*5200, h=t+0.018+fp.hold; filt.frequency.setValueAtTime(c(fp.g),t); filt.frequency.setValueAtTime(c(fp.g),h); filt.frequency.linearRampToValueAtTime(c(Math.max(g0,g1)),h+fp.drop); }
   o1.start(t); o2.start(t); o1.stop(t+len+0.05); o2.stop(t+len+0.05); live.push(o1,o2);
 }
-function sampleVoice(inst,t,len,g0,g1,boost,decay,midi,legatoIn,curve){
-  const s=nearestSample(inst,midi); if(!s) return synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve);
+function sampleVoice(inst,t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp){
+  const s=nearestSample(inst,midi); if(!s) return synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp);
   const src=AC.createBufferSource(), env=AC.createGain();
   src.buffer=s.buf; src.playbackRate.value=Math.pow(2,(midi-s.m)/12);
   src.loop=true; src.loopStart=0.6; src.loopEnd=Math.max(0.9,Math.min(s.buf.duration-0.25,2.8));
   src.connect(env); env.connect(master);
-  envelope(env,t,len,g0,g1,boost,decay,legatoIn,s.buf._g,curve);
+  envelope(env,t,len,g0,g1,boost,decay,legatoIn,s.buf._g,curve,fp);
   src.start(t, legatoIn?0.12:0); src.stop(t+len+0.06); live.push(src);
 }
 let noiseBuf=null;
@@ -125,11 +132,12 @@ async function playExample(o){
     let curve=null;
     if(L && ev.sound>1){ curve=[]; const K=Math.ceil(ev.sound*4); for(let k=1;k<K;k++){ const b=ev.start+ev.sound*k/K; curve.push([t0+T(b)*spb-st, lvlGain(L(b))]); } }
     const first=o.notes[ev.idxs[0]];
-    let boost = ev.legatoIn? 1 : ev.boost;
-    if(o.mode==="dyn" && first.dyn===FP) boost=DYN_GAIN[4]/DYN_GAIN[1];   // fp: forte attack, then piano
+    const boost = ev.legatoIn? 1 : ev.boost;
+    // fp = two events: forte for about half a beat (0.25–0.45 s), then a quick drop to piano
+    const fp = o.mode==="dyn" && first.dyn===FP ? {g:DYN_GAIN[4], hold:Math.max(0.25,Math.min(0.45,spb*0.5)), drop:0.06} : null;
     if(o.inst.perc) snareVoice(st,g0,boost);
-    else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve);
-    else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve);
+    else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
+    else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     if(o.render) ev.idxs.forEach(i=>{
       const n=o.notes[i], a=t0+T(n.start)*spb, b=t0+T(n.start+DUR_BEATS[n.dur]*0.92)*spb;
       at(a,()=>highlight(o.render,i,true)); at(b,()=>highlight(o.render,i,false));
