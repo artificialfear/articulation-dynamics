@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.3.0 — 2026-11-20
+- **Agenda board mode** (`?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=…`): opens straight into Presentation mode as "Articulation of the Day" or "Dynamics of the Day."
+  - Uses the class's level and the same example all day for that class.
+  - Whole band on the middle line, played on concert F.
+  - Saves nothing on the board.
+  - The bar adds an Articulation ⇄ Dynamics switch, tempo − / +, and "Back to agenda."
+- **Class levels:**
+  - 6 Beg: four quarters; staccato, tenuto, and accent; dynamics p–f with no eighths.
+  - 6 Int: adds marcato and rests.
+  - 7th: adds ties and pp–ff.
+  - 8th: adds Long Lifted.
+- Presentation mode now has tempo − / + for everyone.
+
 ## 2.2.0 — 2026-11-19
 - **🎤 Check my playing** (Articulation mode):
   - After a count-off, play the measure into the mic. The app measures how long each note sounded and compares it to the Note Shapes guide.

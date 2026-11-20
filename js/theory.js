@@ -29,6 +29,8 @@ const INSTRUMENTS = [
   { id:"tuba",     name:"Tuba",              clef:"bass",   tr:0,  bb:34, f:7,  eb:5,  rf:7,  snd:"tuba" },
   { id:"mallets",  name:"Mallets",           clef:"treble", tr:0,  bb:70, f:-5, eb:-7, rf:-5, snd:"marimba" },
   { id:"perc",     name:"Percussion (snare)",clef:"percussion", tr:0, bb:70, f:0, eb:0, rf:0, snd:"snare", perc:true },
+  // agenda board: every note on the middle line, played on concert F, so the whole band reads one staff
+  { id:"neutral",  name:"Whole band (concert F)", clef:"treble", tr:0, bb:58, f:-5, eb:5, rf:7, snd:"trumpet", neutral:true, hidden:true },
 ];
 const INST_BY = Object.fromEntries(INSTRUMENTS.map(i=>[i.id,i]));
 
@@ -59,7 +61,7 @@ function tonicMidi(inst,tonic){ return inst.bb + ({Bb:0, F:inst.f, Eb:inst.eb, R
 function concertMidi(inst,pattern,p){ return tonicMidi(inst,PATTERNS[pattern].tonic)+p; }
 function writtenKey(inst,pattern){
   const pat=PATTERNS[pattern];
-  if(inst.perc || !pat.key) return "C";
+  if(inst.perc || inst.neutral || !pat.key) return "C";
   return transposeName(pat.key, inst.tr);
 }
 /* VexFlow key string ("eb/4") for a written MIDI pitch, spelled in keyName when diatonic */
@@ -74,7 +76,7 @@ function spell(midi,keyName){
   return LETTERS[li].toLowerCase()+(alter>0?"#".repeat(alter):"b".repeat(-alter))+"/"+oct;
 }
 function noteKey(inst,pattern,p){
-  if(inst.perc) return "b/4";
+  if(inst.perc || inst.neutral) return "b/4";
   return spell(concertMidi(inst,pattern,p)+inst.tr, writtenKey(inst,pattern));
 }
 function restKey(inst,dur){

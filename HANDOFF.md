@@ -50,6 +50,15 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
   - A note that never goes quiet before the next note counts as full length.
 - Chromium's fake microphone exercises the whole UI flow in the test.
 
+## Agenda board mode (2.3.0)
+- `?board=1&mode=art|dyn&lvl=…&seed=…`. The agenda board (artificialfear/agenda-board, same origin artificialfear.github.io) opens it in an iframe.
+- `LEVELS` in ui.js holds each class level's pool, rhythm options, dynamic range, and tempo.
+- `withSeed()` makes the example repeatable. The board sends `seed=<date>|<level>`, so 3rd and 4th Block (both 7th) share an example.
+- The hidden instrument `neutral` puts every note on b/4 and plays concert F (trumpet samples).
+- `store` is read and write disabled on the board.
+- "Back to agenda" and Esc post `{artDyn:"close"}` to the parent.
+- Must run on the ViewBoard's Chrome ~87: no :is/:where/:has, aspect-ratio, `.at()`, `??=`, or emoji newer than Unicode 9. (🎚 rendered as a box in testing, so Dynamics uses 🔊.)
+
 ## Notes
 - Slurs are only generated with a pattern that moves (a slur over one repeated pitch would look like a tie). The Slur button is disabled when the next note has the same pitch.
 - Articulations go on the notehead side; marcato always goes above.

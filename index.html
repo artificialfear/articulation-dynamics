@@ -102,7 +102,8 @@ details.refwrap summary{cursor:pointer;font-weight:700;color:var(--muted);paddin
 
 /* presentation mode */
 #presentBar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:10px;background:var(--hdr);padding:8px 10px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.35);z-index:20}
-#presentBar .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff;font-size:1.05rem;padding:9px 16px}
+#presentBar .btn{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.2);color:#fff;font-size:1.05rem;padding:9px 16px;white-space:nowrap}
+#presentBar #pTempoVal{white-space:nowrap;min-width:4.2em;text-align:center}
 #presentBar .btn.primary{background:var(--accent);color:var(--accent-ink)}
 html.present header, html.present .transport, html.present section, html.present details.refwrap, html.present footer, html.present .quiz-ctl{display:none!important}
 html.present main{max-width:none;padding:2vh 2vw 90px;height:100vh;display:flex;flex-direction:column;justify-content:center}
@@ -111,6 +112,12 @@ html.present #score svg{width:100%;height:auto;max-height:calc(100vh - 120px)}
 html.present body{background:var(--paper)}
 html.present #qWhich .opt svg{max-height:calc((100vh - 180px)/3)}
 html.present .quiz-msg{font-size:1.5rem;text-align:center}
+#presentBar .tempo-ctl{display:flex;align-items:center;gap:6px;color:#fff;font-weight:700}
+#presentBar .tempo-ctl .btn{padding:9px 13px}
+#boardTitle{display:none}
+html.board #boardTitle{display:block;text-align:center;font-size:2.4vw;color:#1f2a44;margin:0 0 1vh}
+html.board #boardTitle span{color:#6d28d9;font-weight:700}
+html.board #score svg{max-height:calc(100vh - 170px)}
 
 /* quiz */
 .quiz-ctl{display:flex;flex-wrap:wrap;gap:12px;align-items:center}
@@ -158,7 +165,7 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
 </header>
 
 <main>
-  <div class="paper" id="scoreWrap"><div id="score"></div><div id="status" class="status"></div></div>
+  <div class="paper" id="scoreWrap"><div id="boardTitle"></div><div id="score"></div><div id="status" class="status"></div></div>
 
   <div class="row transport" id="transport">
     <button id="play" class="btn primary">▶ Play</button>
@@ -252,6 +259,8 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
   <button id="pPlay" class="btn primary">▶ Play</button>
   <button id="pNew" class="btn">🎲 New</button>
   <button id="pReveal" class="btn">👁 Reveal</button>
+  <button id="pMode" class="btn">🔊 Dynamics</button>
+  <span class="tempo-ctl"><button id="pSlower" class="btn" title="Slower">−</button><span id="pTempoVal">♩ = 80</span><button id="pFaster" class="btn" title="Faster">+</button></span>
   <button id="pExit" class="btn">✕ Exit</button>
 </div>
 
@@ -277,12 +286,12 @@ footer{color:var(--muted);font-size:.78rem;text-align:center;margin-top:18px}
 <div id="sharePop" class="hidden"></div>
 
 <script src="lib/vexflow-4.2.5.js"></script>
-<script src="js/theory.js?v=2.2.0"></script>
-<script src="js/model.js?v=2.2.0"></script>
-<script src="js/render.js?v=2.2.0"></script>
-<script src="js/audio.js?v=2.2.0"></script>
-<script src="js/quiz.js?v=2.2.0"></script>
-<script src="js/mic.js?v=2.2.0"></script>
-<script src="js/ui.js?v=2.2.0"></script>
+<script src="js/theory.js?v=2.3.0"></script>
+<script src="js/model.js?v=2.3.0"></script>
+<script src="js/render.js?v=2.3.0"></script>
+<script src="js/audio.js?v=2.3.0"></script>
+<script src="js/quiz.js?v=2.3.0"></script>
+<script src="js/mic.js?v=2.3.0"></script>
+<script src="js/ui.js?v=2.3.0"></script>
 </body>
 </html>

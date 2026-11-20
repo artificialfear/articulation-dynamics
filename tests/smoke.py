@@ -45,7 +45,7 @@ with sync_playwright() as p:
         for(let k=0;k<3;k++){ const notes=newExample(mode); renderScore(host,{mode,notes,inst:i,pattern:pat,showArts:true,showDyns:true,labels:true,shapes:true}); n++; }
       }
       host.remove(); return n; }""")
-    assert res == 17 * 6 * 2 * 3, res
+    assert res == ev(pg, "INSTRUMENTS.length") * 6 * 2 * 3, res
 
     # ---- random generation invariants
     bad = ev(pg, """()=>{
@@ -189,6 +189,38 @@ with sync_playwright() as p:
       return bad; }""")
     assert same == 0, ("art spot/which", same)
     pg.click("#tabArt"); assert not pg.is_visible("#banner")
+
+    # ---- agenda board mode (?board=1): presentation, class level, same example all day, nothing saved
+    bp = ctx.new_page(); watch(bp)
+    bp.add_init_script("window.__closed=0; window.addEventListener('message', e=>{ if(e.data&&e.data.artDyn==='close') window.__closed++; });")
+    def board(q):
+        bp.goto(f"http://127.0.0.1:{port}/index.html?board=1&{q}"); bp.wait_for_selector("#score svg")
+        return ev(bp, "JSON.stringify(S[S.mode].notes)")
+    a1 = board("mode=art&lvl=7th&seed=2026-11-20|7th"); a2 = board("mode=art&lvl=7th&seed=2026-11-20|7th")
+    a3 = board("mode=art&lvl=7th&seed=2026-11-21|7th")
+    assert a1 == a2 and a1 != a3, "same class + day = same example"
+    assert ev(bp, "document.documentElement.classList.contains('present') && document.documentElement.classList.contains('board')")
+    assert ev(bp, "S.art.notes.every(n=>n.rest || noteKey(inst(),S.pattern,n.p)==='b/4')"), "whole band reads the middle line"
+    assert "Articulation of the Day" in bp.inner_text("#boardTitle") and "7th Grade" in bp.inner_text("#boardTitle")
+    assert not bp.is_visible("header") and bp.is_visible("#presentBar")
+    bp.screenshot(path=f"{out}/board-art-7th.png")
+    beg = board("mode=art&lvl=6beg&seed=2026-11-20|6beg")
+    assert ev(bp, "S.art.notes.length===4 && S.art.notes.every(n=>n.dur==='q' && !n.rest)"), "6 Beg = four quarters"
+    assert ev(bp, "S.art.notes.every(n=>!n.art || ['stacc','ten','acc'].includes(n.art))")
+    board("mode=dyn&lvl=6beg&seed=2026-11-20|6beg")
+    assert ev(bp, "S.dyn.notes.every(n=>n.dur!=='8') && S.dyn.notes.every(n=>n.dyn===null || (n.dyn>=1 && n.dyn<=4))"), "6 Beg dynamics p..f, no eighths"
+    assert "Dynamics of the Day" in bp.inner_text("#boardTitle")
+    bp.screenshot(path=f"{out}/board-dyn-6beg.png")
+    bp.click("#pMode"); assert ev(bp, "S.mode") == "art"
+    t0 = ev(bp, "S.tempo"); bp.click("#pFaster"); assert ev(bp, "S.tempo") == t0 + 4
+    bp.click("#pPlay"); bp.wait_for_timeout(700); bp.click("#pPlay")
+    bp.click("#pReveal"); assert ev(bp, "S.reveal") is True
+    snap = ev(bp, "JSON.stringify(Object.entries(localStorage).filter(([k])=>k.startsWith('adt.')).sort())")
+    bp.click("#pExit"); bp.wait_for_timeout(150); assert ev(bp, "window.__closed") == 1, "Back to agenda tells the board"
+    bp.keyboard.press("Escape"); bp.wait_for_timeout(150); assert ev(bp, "window.__closed") == 2
+    bp.click("#pFaster"); bp.click("#pMode")
+    assert ev(bp, "JSON.stringify(Object.entries(localStorage).filter(([k])=>k.startsWith('adt.')).sort())") == snap, "board saves nothing"
+    bp.close()
 
     # ---- mic analysis on synthetic takes (known lengths, noise, room echo, mic lag)
     acc = ev(pg, """()=>{

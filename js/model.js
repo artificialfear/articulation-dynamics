@@ -35,6 +35,13 @@ const DYN_GAIN = [0.05, 0.10, 0.17, 0.26, 0.40, 0.58];
 const DUR_BEATS = { w:4, h:2, q:1, "8":0.5 };
 
 const rnd = n => Math.floor(Math.random()*n);
+function seededRandom(str){
+  let h=1779033703^str.length;
+  for(let i=0;i<str.length;i++){ h=Math.imul(h^str.charCodeAt(i),3432918353); h=h<<13|h>>>19; }
+  let a=h>>>0;
+  return ()=>{ a=(a+0x6D2B79F5)|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; };
+}
+function withSeed(seed,fn){ const orig=Math.random; Math.random=seededRandom(String(seed)); try{ return fn(); } finally { Math.random=orig; } }
 const pick = arr => arr[rnd(arr.length)];
 const shuffle = a => { for(let i=a.length-1;i>0;i--){ const j=rnd(i+1); [a[i],a[j]]=[a[j],a[i]]; } return a; };
 function weighted(opts){ const t=opts.reduce((s,o)=>s+o[1],0); let r=Math.random()*t; for(const o of opts){ if((r-=o[1])<0) return o[0]; } return opts[0][0]; }
@@ -47,6 +54,7 @@ const sounding = notes => notes.map((n,i)=>i).filter(i=>!notes[i].rest);
 /* ---------------- rhythm generation ---------------- */
 function genMeasureArt(m,opt){
   const out=[]; const base=m*4;
+  if(opt.noEighths){ for(let b=0;b<4;b++) out.push(blank("q",base+b)); return out; }
   let q=0,e=0;
   for(let b=0;b<4;b++){
     const o=[["q",4],["ee",4]];
@@ -67,7 +75,7 @@ function genMeasureDyn(m,opt){
     const o=[];
     if(pos===0) o.push(["w",1]);
     if(pos%2===0) o.push(["h",3]);
-    o.push(["q",4],["ee",2]);
+    o.push(["q",4]); if(!opt.noEighths) o.push(["ee",2]);
     if(opt.rests && pos>0) o.push(["qr",1]);
     const c=weighted(o);
     if(c==="ee"){ out.push(blank("8",base+pos),blank("8",base+pos+0.5)); pos+=1; }
@@ -124,7 +132,7 @@ function randomizeArts(notes,pool){
 
 /* ---------------- dynamics ---------------- */
 function hpEnd(notes,i){ for(let j=i+1;j<notes.length;j++) if(notes[j].dyn!==null) return j; return -1; }
-function randomizeDyns(notes){
+function randomizeDyns(notes,lo=0,hi=5){
   notes.forEach(n=>{n.dyn=null;n.hp=null;});
   const ok = notes.map((n,i)=>i).filter(i=>!notes[i].rest && !tiedInto(notes,i) && Number.isInteger(notes[i].start));
   if(!ok.length) return;
@@ -137,22 +145,24 @@ function randomizeDyns(notes){
     if(chosen.every(j=>Math.abs(notes[j].start-notes[i].start)>=2)) chosen.push(i);
   }
   chosen.sort((a,b)=>a-b);
+  const mid=(lo+hi)/2;
   if(chosen.length===1){                         // only one spot for a marking: hairpin to the end
-    const lv=1+rnd(4); notes[chosen[0]].dyn=lv; notes[chosen[0]].hp = lv>=3? "dim" : "cresc"; return;
+    const lv=lo+rnd(hi-lo+1); notes[chosen[0]].dyn=lv; notes[chosen[0]].hp = lv>mid? "dim" : "cresc"; return;
   }
   const hp = chosen.slice(0,-1).map(()=>Math.random()<0.6);
   if(hp.length && !hp.some(Boolean)) hp[rnd(hp.length)]=true;
-  let lvl = 1+rnd(4);
+  // start away from the edges when the range allows (p..f in the full range)
+  let lvl = hi-lo>=3? lo+1+rnd(hi-lo-1) : lo+rnd(hi-lo+1);
   notes[chosen[0]].dyn=lvl;
   for(let k=1;k<chosen.length;k++){
     let next;
     if(hp[k-1]){
       let dir=Math.random()<0.5?1:-1;
-      if(lvl+dir<0||lvl+dir>5) dir=-dir;
-      const room = dir>0? 5-lvl : lvl;
+      if(lvl+dir<lo||lvl+dir>hi) dir=-dir;
+      const room = dir>0? hi-lvl : lvl-lo;
       next = lvl + dir*Math.min(3, 1+rnd(room));
       notes[chosen[k-1]].hp = dir>0?"cresc":"dim";
-    } else { do { next=rnd(6); } while(next===lvl || Math.abs(next-lvl)>3); }
+    } else { do { next=lo+rnd(hi-lo+1); } while(next===lvl || Math.abs(next-lvl)>3); }
     notes[chosen[k]].dyn=next; lvl=next;
   }
 }

@@ -3,11 +3,25 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.2.0";
+const VERSION = "2.3.0";
 const $ = id => document.getElementById(id);
+/* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
+   Opens in presentation mode with the class's level; nothing is saved on the board. */
+const QS = new URLSearchParams(location.search);
+const BOARD = QS.get("board")==="1";
+const LEVELS = {
+  "6beg": { name:"6th Grade Beginning Band", tempo:72, range:[1,4], pool:{stacc:true,ten:true,acc:true},
+            art:{rests:false,slurs:false,ties:false,noEighths:true}, dyn:{rests:false,slurs:false,ties:false,noEighths:true} },
+  "6int": { name:"6th Grade Intermediate Band", tempo:80, range:[1,4], pool:{stacc:true,ten:true,acc:true,marc:true},
+            art:{rests:true,slurs:false,ties:false}, dyn:{rests:true,slurs:false,ties:false} },
+  "7th":  { name:"7th Grade Band", tempo:88, range:[0,5], pool:{stacc:true,ten:true,acc:true,marc:true},
+            art:{rests:true,slurs:false,ties:true}, dyn:{rests:true,slurs:false,ties:true} },
+  "8th":  { name:"8th Grade Band", tempo:96, range:[0,5], pool:{stacc:true,ten:true,acc:true,marc:true,lift:true},
+            art:{rests:true,slurs:false,ties:true}, dyn:{rests:true,slurs:false,ties:true} },
+};
 const store = {
-  get(k,d){ try{ const v=localStorage.getItem("adt."+k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
-  set(k,v){ try{ localStorage.setItem("adt."+k, JSON.stringify(v)); }catch(e){} }
+  get(k,d){ if(BOARD && k!=="theme") return d; try{ const v=localStorage.getItem("adt."+k); return v===null? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ if(BOARD) return; try{ localStorage.setItem("adt."+k, JSON.stringify(v)); }catch(e){} }
 };
 // carry settings over from v1 (clef + playback pitch)
 const legacyInst = ({treble:"concertT",bass:"concertB",percussion:"perc"})[store.get("clef","treble")]||"concertT";
@@ -28,7 +42,7 @@ const S = {
   artOpt: Object.assign({rests:true,slurs:true,ties:false}, store.get("artOpt",{})),
   dynOpt: Object.assign({rests:false,slurs:true,ties:true}, store.get("dynOpt",{})),
   art:{notes:[],sel:-1}, dyn:{notes:[],sel:-1},
-  present:false, reveal:false, presentFs:false,
+  present:false, reveal:false, presentFs:false, dynRange:[0,5],
 };
 if(!INST_BY[S.inst]) S.inst="concertT";
 if(!PATTERNS[S.pattern]) S.pattern="single_F";
@@ -44,7 +58,7 @@ function newExample(mode){
   if(opt.ties && !perc) addTies(notes,mode);
   if(opt.slurs && !perc && patternMoves(S.pattern)) addSlur(notes);
   assignPitches(notes,S.pattern);
-  if(mode==="art") randomizeArts(notes,S.pool); else randomizeDyns(notes);
+  if(mode==="art") randomizeArts(notes,S.pool); else randomizeDyns(notes,S.dynRange[0],S.dynRange[1]);
   return notes;
 }
 function repitch(notes){ assignPitches(notes,S.pattern); }
@@ -178,6 +192,13 @@ function updateChrome(){
   $("micBtn").classList.toggle("hidden", m!=="art" || typeof Mic==="undefined" || !Mic.supported());
   $("artRefs").classList.toggle("hidden",m==="dyn"); $("dynRefs").classList.toggle("hidden",m==="art");
   $("pReveal").textContent = m==="quiz"? "👁 Reveal" : (S.reveal? "🙈 Hide shapes" : "👁 Show shapes");
+  $("pTempoVal").textContent = "♩ = "+S.tempo;
+  $("pMode").classList.toggle("hidden", m==="quiz");
+  $("pMode").textContent = m==="art"? "🔊 Dynamics" : "🎵 Articulation";
+  if(BOARD){
+    const lv=LEVELS[QS.get("lvl")]||LEVELS["7th"];
+    $("boardTitle").innerHTML = `<b>${m==="art"?"🎵 Articulation":"🔊 Dynamics"} of the Day</b> · ${lv.name} · <span>play on concert F</span>`;
+  }
   if(m!=="quiz" && $("banner")) $("banner").classList.add("hidden");
 }
 
@@ -257,10 +278,11 @@ function exitFs(){ if(fsEl()) (document.exitFullscreen||document.webkitExitFulls
 function toggleFullscreen(){ fsEl()? exitFs() : requestFs(); }
 function enterPresent(){
   S.present=true; S.reveal=false; document.documentElement.classList.add("present"); $("presentBar").classList.remove("hidden");
-  closeDrawer(); requestFs(); draw();
+  closeDrawer(); if(!BOARD) requestFs(); draw();
 }
 function exitPresent(){
   if(!S.present) return;
+  if(BOARD){ stopPlayback(); try{ window.parent.postMessage({artDyn:"close"},"*"); }catch(e){} return; }
   S.present=false; S.presentFs=false; document.documentElement.classList.remove("present"); $("presentBar").classList.add("hidden");
   exitFs(); draw();
 }
@@ -279,6 +301,9 @@ $("present").onclick=()=> S.present? exitPresent() : enterPresent();
 $("pExit").onclick=exitPresent;
 $("pPlay").onclick=play;
 $("pNew").onclick=()=>newHere();
+$("pMode").onclick=()=>{ S.mode = S.mode==="art"? "dyn" : "art"; S.reveal=false; draw(); };
+function nudgeTempo(d){ S.tempo=Math.max(50,Math.min(160,S.tempo+d)); store.set("tempo",S.tempo); $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm"; updateChrome(); }
+$("pSlower").onclick=()=>nudgeTempo(-4); $("pFaster").onclick=()=>nudgeTempo(4);
 $("pReveal").onclick=()=>{ if(S.mode==="quiz") Quiz.reveal(); else { S.reveal=!S.reveal; draw(); } };
 
 /* ---------------- settings drawer ---------------- */
@@ -295,7 +320,7 @@ $("aNewRhythm").onclick=()=>{ S.art.notes=newExample("art"); S.art.sel=-1; dirty
 $("dNewRhythm").onclick=()=>{ S.dyn.notes=newExample("dyn"); S.dyn.sel=-1; dirty(); draw(); };
 $("aShuffle").onclick=()=>{ randomizeArts(S.art.notes,S.pool); dirty(); draw(); };
 $("aClear").onclick=()=>{ S.art.notes.forEach(n=>n.art=null); dirty(); draw(); };
-$("dShuffle").onclick=()=>{ randomizeDyns(S.dyn.notes); S.dyn.sel=-1; dirty(); draw(); };
+$("dShuffle").onclick=()=>{ randomizeDyns(S.dyn.notes,S.dynRange[0],S.dynRange[1]); S.dyn.sel=-1; dirty(); draw(); };
 $("dClear").onclick=()=>{ S.dyn.notes.forEach(n=>{n.dyn=null;n.hp=null;}); dirty(); draw(); };
 $("play").onclick=play;
 $("micBtn").onclick=()=>Mic.toggle();
@@ -327,8 +352,8 @@ document.addEventListener("keydown",e=>{
   const k=e.key;
   if(k===" "){ e.preventDefault(); play(); return; }
   if(k==="n"||k==="N"){ newHere(); return; }
-  if(k==="p"||k==="P"){ S.present? exitPresent() : enterPresent(); return; }
-  if(k==="f"||k==="F"){ toggleFullscreen(); return; }
+  if(!BOARD && (k==="p"||k==="P")){ S.present? exitPresent() : enterPresent(); return; }
+  if(!BOARD && (k==="f"||k==="F")){ toggleFullscreen(); return; }
   if(k==="r"||k==="R"){ $("pReveal").click(); return; }
   if(k==="Escape"){ if(S.present){ exitPresent(); return; } closeDrawer(); closeShare(); if(S.mode!=="quiz"){ st().sel=-1; applySel(); updatePanels(); } return; }
   if(S.mode==="quiz"){ Quiz.onKey && Quiz.onKey(e); return; }
@@ -352,10 +377,23 @@ $("ver").textContent=VERSION;
 applyTheme(store.get("theme", matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));
 buildStatic();
 $("inst").value=S.inst; $("pattern").value=S.pattern;
-const fromLink=loadFromHash();
+if(BOARD){
+  const lv=LEVELS[QS.get("lvl")]||LEVELS["7th"];
+  Object.assign(S,{ inst:"neutral", pattern:"single_F", tempo:lv.tempo, dynRange:lv.range, labels:false, shapes:true,
+    countin:true, metro:true, cursor:true, sound:"inst", mode: QS.get("mode")==="dyn"? "dyn" : "art",
+    pool:Object.assign({stacc:false,ten:false,acc:false,marc:false,lift:false,none:false},lv.pool), artOpt:lv.art, dynOpt:lv.dyn });
+  const seed=QS.get("seed")||new Date().toDateString();
+  S.art.notes=withSeed(seed+"|art",()=>newExample("art"));      // same example all day for this class
+  S.dyn.notes=withSeed(seed+"|dyn",()=>newExample("dyn"));
+  document.documentElement.classList.add("board");
+  $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm";
+  $("pExit").textContent="✕ Back to agenda";
+}
+const fromLink=!BOARD && loadFromHash();
 if(fromLink){ $("pattern").value=S.pattern; $("tempo").value=S.tempo; $("tempoVal").textContent=S.tempo+" bpm"; }
 if(!S.art.notes.length) S.art.notes=newExample("art");
 if(!S.dyn.notes.length) S.dyn.notes=newExample("dyn");
 if(typeof Quiz!=="undefined" && Quiz.init) Quiz.init();
 if(typeof Quiz==="undefined"){ $("tabQuiz").classList.add("hidden"); }
 setMode(S.mode);
+if(BOARD) enterPresent();
