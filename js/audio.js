@@ -69,6 +69,12 @@ function synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp){
   if(fp){ const c=v=>500+v*5200, h=t+0.018+fp.hold; filt.frequency.setValueAtTime(c(fp.g),t); filt.frequency.setValueAtTime(c(fp.g),h); filt.frequency.linearRampToValueAtTime(c(Math.max(g0,g1)),h+fp.drop); }
   o1.start(t); o2.start(t); o1.stop(t+len+0.05); o2.stop(t+len+0.05); live.push(o1,o2);
 }
+/* "Synth (octaves)": the note plus the octave below, each a bit softer so the pair isn't louder than one note */
+function octaveVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp){
+  const k=0.62, sc=x=>x*k;
+  [midi, midi-12].forEach(m=>synthVoice(t,len,sc(g0),sc(g1),boost,decay,m,legatoIn,
+    curve&&curve.map(([dt,g])=>[dt,sc(g)]), fp&&Object.assign({},fp,{g:sc(fp.g)})));
+}
 function sampleVoice(inst,t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp){
   const s=nearestSample(inst,midi); if(!s) return synthVoice(t,len,g0,g1,boost,decay,midi,legatoIn,curve,fp);
   const src=AC.createBufferSource(), env=AC.createGain();
@@ -136,6 +142,7 @@ async function playExample(o){
     // fp = two events: forte for about half a beat (0.25–0.45 s), then a quick drop to piano
     const fp = o.mode==="dyn" && first.dyn===FP ? {g:DYN_GAIN[4], hold:Math.max(0.25,Math.min(0.45,spb*0.5)), drop:0.06} : null;
     if(o.inst.perc) snareVoice(st,g0,boost);
+    else if(o.sound==="octaves") octaveVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     if(o.render) ev.idxs.forEach(i=>{

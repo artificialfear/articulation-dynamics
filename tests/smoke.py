@@ -290,6 +290,15 @@ with sync_playwright() as p:
       return [rms(0.05,0.35), rms(0.6,2.0)]; }""")
     assert fpq[0] > 3 * fpq[1], ("fp: forte part should be clearly louder than the piano part", fpq)
     assert ev(pg, "(()=>{ const src=String(playExample); return src.includes('hold:Math.max(0.25') })()")
+    # "Synth (octaves)": every note sounds twice, an octave apart
+    octs = ev(pg, """()=>{ const freqs=[]; const orig=synthVoice;
+      window.synthVoice=function(t,len,g0,g1,b,d,midi){ freqs.push(midi); };
+      try{ octaveVoice(0,1,0.2,0.2,1,false,65,false,null,null); } finally { window.synthVoice=orig; }
+      return freqs; }""")
+    assert octs == [65, 53], octs
+    pg.click("#gear"); pg.select_option("#sound", "octaves"); pg.click("#drawerClose"); pg.wait_for_timeout(300)
+    pg.click("#warmPlay"); pg.wait_for_timeout(1500); pg.click("#warmPlay")
+    pg.click("#gear"); pg.select_option("#sound", "inst"); pg.click("#drawerClose"); pg.wait_for_timeout(300)
     # ff is drawn tighter than two separate f's
     kern = ev(pg, "[dynWidth('ff',38), 2*dynWidth('f',38)]"); assert kern[0] < kern[1]*0.8, kern
     pg.click("#warmSel [data-v=both]")

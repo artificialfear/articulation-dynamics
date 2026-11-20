@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.3 — 2026-11-20
+- New sound option in ⚙ Settings → Sound: **Synth (octaves)**. Each note plays with the octave below it. Articulations, dynamics, hairpins, and fp all shape it the same way.
+
 ## 2.4.2 — 2026-11-20
 - **fp** now plays as two events: it holds forte for about half a beat (0.25–0.45 s, depending on tempo), then drops quickly to piano. A crescendo after it starts from that piano.
 

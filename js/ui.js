@@ -3,7 +3,7 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.4.2";
+const VERSION = "2.4.3";
 const $ = id => document.getElementById(id);
 /* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
    Opens in presentation mode with the class's level; nothing is saved on the board. */

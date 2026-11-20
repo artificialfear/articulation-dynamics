@@ -8,7 +8,7 @@ Repo: artificialfear/articulation-dynamics. Live at https://artificialfear.githu
 - `js/theory.js`: instruments (transposition `tr`, warm-up register `bb`, scale tonics `f`/`eb`, Remington/single-F tonic `rf`), pitch patterns, note spelling (`spell`, `noteKey`, `writtenKey`).
 - `js/model.js`: data model, random generation, articulation and dynamics randomizers, `levelFn` (loudness over time), `playPlan` (sound events shared by audio and mic), rhythm builder, share-link encode/decode.
 - `js/render.js`: VexFlow drawing of one example (`renderScore`) plus the icon helpers.
-- `js/audio.js`: Web Audio playback, with samples, synth, snare, metronome, cursor, and highlight.
+- `js/audio.js`: Web Audio playback, with samples, synth, snare, metronome, cursor, and highlight. Sound options: `inst` (samples), `synth`, and `octaves` (2.4.3: `octaveVoice` plays two `synthVoice`s, midi and midi−12, each at 0.62 gain). Board mode always uses `inst`.
 - `js/ui.js`: state, panels, settings drawer, share popover, presentation and full screen, keyboard.
 - `js/quiz.js`, `js/mic.js`: Listening Quiz and mic check (see below).
 - `lib/vexflow-4.2.5.js`: bundled locally (no CDN).
