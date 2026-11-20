@@ -105,7 +105,8 @@ function click(t,strong,vol=1){
 function at(t,fn){ timers.push(setTimeout(fn, Math.max(0,(t-AC.currentTime)*1000))); }
 
 /* ---------- playback ----------
-   o: {notes, mode, inst, pattern, tempo, countin, metro, render, cursor, sound, onEnd, onStatus, noCountClicks} */
+   o: {notes, mode, inst, pattern, tempo, countin, metro, render, cursor, sound, onEnd, onStatus, noCountClicks,
+       visualDelay (s): Bluetooth/board speaker delay — the cursor and highlights wait for the sound} */
 async function playExample(o){
   stopPlayback();
   audio(); playing=true; const token=++playToken;
@@ -127,7 +128,7 @@ async function playExample(o){
   const t0=t-T(from)*spb;                                   // so `from` lands right after the count-off
   if(o.metro) for(let b=Math.ceil(from);b<to;b++){ if(tm && tm.inHold(b)) continue; click(t0+T(b)*spb,b%4===0,0.55); }
   const L = o.mode==="dyn"? levelFn(o.notes) : null;
-  const base=DYN_GAIN[3];
+  const base=DYN_GAIN[3], vd=Math.max(0,Math.min(1,o.visualDelay||0));
   playPlan(o.notes,o.mode).forEach(ev=>{
     if(ev.start<from-1e-6 || ev.start>=to-1e-6) return;
     const st=t0+T(ev.start)*spb, en=t0+T(ev.start+ev.sound)*spb;
@@ -146,12 +147,12 @@ async function playExample(o){
     else if(useSamples) sampleVoice(o.inst,st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     else synthVoice(st,len,g0,g1,boost,ev.decay,midi,ev.legatoIn,curve,fp);
     if(o.render) ev.idxs.forEach(i=>{
-      const n=o.notes[i], a=t0+T(n.start)*spb, b=t0+T(n.start+DUR_BEATS[n.dur]*0.92)*spb;
+      const n=o.notes[i], a=t0+T(n.start)*spb+vd, b=t0+T(n.start+DUR_BEATS[n.dur]*0.92)*spb+vd;
       at(a,()=>highlight(o.render,i,true)); at(b,()=>highlight(o.render,i,false));
     });
   });
-  if(o.cursor && o.render) startCursor(o.render,t0,spb,total,tm,from,to);
-  at(t0+T(to)*spb+0.06,()=>{ if(token===playToken){ stopPlayback(); o.onEnd&&o.onEnd(); } });
+  if(o.cursor && o.render) startCursor(o.render,t0+vd,spb,total,tm,from,to);
+  at(t0+T(to)*spb+0.06+vd,()=>{ if(token===playToken){ stopPlayback(); o.onEnd&&o.onEnd(); } });
   return {t0,spb,countT,total};
 }
 function highlight(render,i,on){ const el=render.els[i]; if(el) el.classList.toggle("play",on); }

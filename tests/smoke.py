@@ -205,6 +205,19 @@ with sync_playwright() as p:
     assert "Articulation of the Day" in bp.inner_text("#boardTitle") and "7th Grade" in bp.inner_text("#boardTitle")
     assert not bp.is_visible("header") and bp.is_visible("#presentBar")
     bp.screenshot(path=f"{out}/board-art-7th.png")
+    # speaker delay from the board: the cursor waits for the sound
+    board("mode=art&lvl=7th&seed=2026-11-20|7th&delay=400")
+    assert ev(bp, "VIS_DELAY") == 0.4
+    dl = ev(bp, """async()=>{ const r=await playExample({visualDelay:VIS_DELAY, notes:S.art.notes, mode:'art', inst:inst(), pattern:S.pattern,
+          tempo:60, countin:false, metro:false, render:R, cursor:true, sound:'synth'});
+        await new Promise(z=>setTimeout(z,450)); const x1=+document.querySelector('#score line.cursor').getAttribute('x1');
+        const start=R.anchors[0][1]; stopPlayback(); return [x1,start, AC.currentTime-r.t0]; }""")
+    assert abs(dl[0] - dl[1]) < 2, ("cursor still waiting at the start while the delay runs", dl)
+    nd = ev(bp, """async()=>{ const r=await playExample({visualDelay:0, notes:S.art.notes, mode:'art', inst:inst(), pattern:S.pattern,
+          tempo:60, countin:false, metro:false, render:R, cursor:true, sound:'synth'});
+        await new Promise(z=>setTimeout(z,450)); const x1=+document.querySelector('#score line.cursor').getAttribute('x1');
+        stopPlayback(); return x1-R.anchors[0][1]; }""")
+    assert nd > 15, ("without a delay the cursor has moved by now (break-check of the delay test)", nd)
     beg = board("mode=art&lvl=6beg&seed=2026-11-20|6beg")
     assert ev(bp, "S.art.notes.length===4 && S.art.notes.every(n=>n.dur==='q' && !n.rest)"), "6 Beg = four quarters"
     assert ev(bp, "S.art.notes.every(n=>!n.art || ['stacc','ten','acc'].includes(n.art))")

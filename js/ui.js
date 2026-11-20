@@ -3,12 +3,14 @@
    ui.js — app state, panels, settings drawer, sharing, presentation
    mode, keyboard. Quiz and mic check live in quiz.js / mic.js.
    ===================================================================== */
-const VERSION = "2.4.4";
+const VERSION = "2.4.5";
 const $ = id => document.getElementById(id);
 /* Agenda board: ?board=1&mode=art|dyn&lvl=6beg|6int|7th|8th&seed=<date|level>
    Opens in presentation mode with the class's level; nothing is saved on the board. */
 const QS = new URLSearchParams(location.search);
 const BOARD = QS.get("board")==="1";
+// board's 🔈 Speaker delay (ms, from the agenda board's settings): visuals wait this long so they line up with the sound
+const VIS_DELAY = BOARD? Math.max(0,Math.min(1000,+QS.get("delay")||0))/1000 : 0;
 const LEVELS = {
   "6beg": { name:"6th Grade Beginning Band", tempo:72, range:[1,4], pool:{stacc:true,ten:true,acc:true},
             art:{rests:false,slurs:false,ties:false,noEighths:true}, dyn:{rests:false,slurs:false,ties:false,noEighths:true} },
@@ -108,7 +110,7 @@ function renderWarmup(){
 }
 function playWarm(){
   const s=warmRange();
-  playExample({notes:WARM, mode:"dyn", inst:inst(), pattern:warmPattern(), tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor,
+  playExample({visualDelay:VIS_DELAY, notes:WARM, mode:"dyn", inst:inst(), pattern:warmPattern(), tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor,
     sound:S.sound, total:filled(WARM), from:s.from, to:s.to, onStatus:setStatus});
   setPlayLabels(true);
 }
@@ -272,7 +274,7 @@ function play(){
   if(playing){ stopPlayback(); return; }
   if(S.mode==="quiz"){ Quiz.play(); }
   else if(isWarm()){ playWarm(); return; }
-  else playExample({notes:st().notes, mode:S.mode, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor, sound:S.sound, onStatus:setStatus});
+  else playExample({visualDelay:VIS_DELAY, notes:st().notes, mode:S.mode, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro, render:R, cursor:S.cursor, sound:S.sound, onStatus:setStatus});
   setPlayLabels(true);
 }
 function setPlayLabels(on){ $("play").textContent=on?"■ Stop":"▶ Play"; $("pPlay").textContent=on?"■ Stop":"▶ Play"; }

@@ -99,7 +99,7 @@ const Quiz = {
     const q=Q.q; if(!q) return;
     const notes = q.type==="spot"? q.played : q.type==="which"? q.options[q.answer] : q.notes;
     const showWhere = q.type!=="which";            // never highlight which option is playing
-    playExample({notes, mode:q.topic, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro,
+    playExample({visualDelay:VIS_DELAY, notes, mode:q.topic, inst:inst(), pattern:S.pattern, tempo:S.tempo, countin:S.countin, metro:S.metro,
       render: showWhere? R : null, cursor: showWhere && S.cursor, sound:S.sound, onStatus:setStatus});
   },
   /* ---------- answering ---------- */

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2.4.5 — 2026-11-20
+- Agenda board: the trainer uses the board's **🔈 Speaker delay** (set in Rhythm of the Day). The cursor and highlighted notes wait that long, so they line up with what students hear through the speaker.
+
 ## 2.4.4 — 2026-11-20
 - The agenda board's Articulation / Dynamics overlay and Warm-up now play **Synth (octaves)** instead of the trumpet sound.
 

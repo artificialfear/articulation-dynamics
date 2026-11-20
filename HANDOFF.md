@@ -57,6 +57,7 @@ Note: `{dur:'w'|'h'|'q'|'8', start, rest, p, art, dyn, hp, sl, tie}`.
 - The hidden instrument `neutral` puts every note on b/4 and plays concert F. Since 2.4.4 the board plays it with the octave synth, so no samples load.
 - `store` is read and write disabled on the board.
 - "Back to agenda" and Esc post `{artDyn:"close"}` to the parent.
+- `&delay=<ms>` (2.4.5) carries the board's settings.audioDelay into `VIS_DELAY`. playExample `visualDelay` shifts the highlights, the cursor, and the end of playback; the sound itself isn't moved.
 - Must run on the ViewBoard's Chrome ~87: no :is/:where/:has, aspect-ratio, `.at()`, `??=`, or emoji newer than Unicode 9. (🎚 rendered as a box in testing, so Dynamics uses 🔊.)
 
 ## Dynamics Warm-up (2.4.0, changed in 2.4.1)
